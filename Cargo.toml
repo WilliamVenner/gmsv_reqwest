@@ -1,0 +1,21 @@
+[package]
+name = "gmsv_reqwest"
+version = "0.1.0"
+authors = ["William Venner <william@venner.io>"]
+edition = "2018"
+publish = false
+
+[lib]
+name = "gmsv_reqwest"
+crate-type = ["cdylib"]
+
+[dependencies]
+reqwest = { version = "0.11.4", default-features = false, features = ["rustls-tls"] }
+tokio = { version = "1.7.1", features = ["rt", "macros"] }
+libloading = "0.7.0"
+lazy_static = "1.4.0"
+cstr = "0.2.8"
+crossbeam = "0.8.1"
+thiserror = "1.0.25"
+futures = "0.3.15"
+parking_lot = "0.11.1"
