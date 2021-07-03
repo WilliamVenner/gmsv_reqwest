@@ -29,3 +29,9 @@ else
     my_http = HTTP
 end
 ```
+
+## Limitations
+
+Currently, this module cannot send HTTP requests with a custom method (the default Valve HTTP client can), due to this not being supported upstream.
+
+Workaround: don't do that 🙂
