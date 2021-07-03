@@ -6,16 +6,8 @@ use crate::lua::{self, LuaReference};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-	//#[error("unsuccessful")]
-	//Generic,
 	#[error("invalid url")]
 	InvalidURL,
-
-	#[error("unsupported method")]
-	/// Unfortunately, reqwest does not support custom methods yet
-	///
-	/// The native Gmod HTTP function can send requests with custom methods, so this is a limitation of this module.
-	UnsupportedMethod,
 }
 
 #[derive(Debug)]
@@ -63,18 +55,12 @@ impl HTTPRequest {
 					lua.pop();
 					reqwest::Method::GET
 				} else {
-					let method = lua.check_string(-1).into_owned().to_ascii_uppercase();
+					let method = lua.get_binary_string(-1);
 					lua.pop();
-					match method.as_str() {
-						"GET" => reqwest::Method::GET,
-						"POST" => reqwest::Method::POST,
-						"HEAD" => reqwest::Method::HEAD,
-						"PUT" => reqwest::Method::PUT,
-						"DELETE" => reqwest::Method::DELETE,
-						"PATCH" => reqwest::Method::PATCH,
-						"OPTIONS" => reqwest::Method::OPTIONS,
-						_ => return Err(Error::UnsupportedMethod),
-					}
+
+					method
+						.and_then(|bytes| reqwest::Method::from_bytes(&bytes).ok())
+						.unwrap_or(reqwest::Method::GET)
 				}
 			};
 
