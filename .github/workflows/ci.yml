@@ -1,0 +1,35 @@
+name: ci
+
+on: [push, pull_request]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  ci_linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install gcc-multilib
+      run: sudo apt-get install gcc-multilib
+    - name: Install nightly toolchain
+      run: rustup toolchain install nightly
+    - name: Add targets
+      run: rustup target add x86_64-unknown-linux-gnu && rustup target add i686-unknown-linux-gnu
+    - name: Check 64-bit
+      run: cargo +nightly check --release --target x86_64-unknown-linux-gnu
+    - name: Check 32-bit
+      run: cargo +nightly check --release --target i686-unknown-linux-gnu
+
+  ci_windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install nightly toolchain
+      run: rustup toolchain install nightly
+    - name: Add targets
+      run: rustup target add x86_64-pc-windows-msvc && rustup target add i686-pc-windows-msvc
+    - name: Check 64-bit
+      run: cargo +nightly check --release --target x86_64-pc-windows-msvc
+    - name: Check 32-bit
+      run: cargo +nightly check --release --target i686-pc-windows-msvc
