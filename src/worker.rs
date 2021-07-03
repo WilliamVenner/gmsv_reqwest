@@ -1,6 +1,10 @@
 use reqwest::header::HeaderMap;
 
-use crate::{http::HTTPRequest, lua::{self, LUA_REGISTRYINDEX, LuaInt, LuaReference}, channels::{StaticSender, StaticReceiver}};
+use crate::{
+	channels::{StaticReceiver, StaticSender},
+	http::HTTPRequest,
+	lua::{self, LuaInt, LuaReference, LUA_REGISTRYINDEX},
+};
 
 pub type CallbackResult = (LuaReference, i32, HeaderMap, Vec<u8>);
 
@@ -11,12 +15,17 @@ lazy_static! {
 }
 pub fn request_worker() {
 	let (tx, request_rx) = crossbeam::channel::unbounded::<HTTPRequest>();
-	unsafe { WORKER_CHANNEL.borrow_mut().as_mut_ptr().write(tx) };
+	WORKER_CHANNEL.borrow_mut().replace(tx);
 
 	let (tx, response_rx) = crossbeam::channel::unbounded::<CallbackResult>();
 	unsafe { CALLBACK_CHANNEL.borrow_mut().as_mut_ptr().write(response_rx) };
 
-	let runtime = tokio::runtime::Builder::new_current_thread().enable_io().enable_time().build().expect("Failed to start Tokio runtime");
+	let runtime = tokio::runtime::Builder::new_current_thread()
+		.enable_io()
+		.enable_time()
+		.build()
+		.expect("Failed to start Tokio runtime");
+
 	runtime.block_on(async move {
 		tokio::task::spawn_blocking(move || {
 			while let Ok(mut request) = request_rx.recv() {
@@ -24,19 +33,25 @@ pub fn request_worker() {
 				tokio::spawn(async move {
 					let success = request.success.take();
 
-					let response: reqwest::Response = CLIENT.execute(request.into_reqwest(&*CLIENT)).await.expect("Failed to parse URI (which should have already been parsed?) This is a bug.");
+					let response: reqwest::Response = CLIENT
+						.execute(request.into_reqwest(&*CLIENT))
+						.await
+						.expect("Failed to parse URI (which should have already been parsed?) This is a bug.");
 
 					if let Some(success) = success {
 						tx.send((
 							success,
 							response.status().as_u16() as i32,
 							response.headers().to_owned(),
-							response.bytes().await.expect("Failed to decode body bytes. This is a bug").to_vec()
-						)).expect("Response receiving channel hung up. This is a bug");
+							response.bytes().await.expect("Failed to decode body bytes. This is a bug").to_vec(),
+						))
+						.expect("Response receiving channel hung up. This is a bug");
 					}
 				});
 			}
-		}).await.expect("Error in reqwest worker");
+		})
+		.await
+		.expect("Error in reqwest worker");
 	});
 }
 

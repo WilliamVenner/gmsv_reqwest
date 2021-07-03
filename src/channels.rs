@@ -1,11 +1,11 @@
 use std::{cell::RefCell, mem::MaybeUninit};
 
-use crossbeam::channel::{Receiver, TryRecvError, SendError, Sender};
+use crossbeam::channel::{Receiver, SendError, Sender, TryRecvError};
 
-pub struct StaticSender<T>(RefCell<MaybeUninit<Sender<T>>>);
+pub struct StaticSender<T>(RefCell<Option<Sender<T>>>);
 impl<T> StaticSender<T> {
 	pub fn uninit() -> Self {
-		Self(RefCell::new(MaybeUninit::uninit()))
+		Self(RefCell::new(None))
 	}
 
 	pub unsafe fn kill(&self) {
@@ -13,20 +13,20 @@ impl<T> StaticSender<T> {
 		let mut borrow = loop {
 			match self.try_borrow_mut() {
 				Ok(borrow) => break borrow,
-				Err(_) => continue
+				Err(_) => continue,
 			}
 		};
-		std::ptr::drop_in_place(borrow.as_mut_ptr());
+		drop(borrow.take());
 	}
 
 	#[inline]
 	pub fn send(&self, request: T) -> Result<(), SendError<T>> {
-		unsafe { self.borrow().assume_init_ref() }.send(request)
+		self.borrow().as_ref().unwrap().send(request)
 	}
 }
 unsafe impl<T> Sync for StaticSender<T> {}
 impl<T> std::ops::Deref for StaticSender<T> {
-	type Target = RefCell<MaybeUninit<Sender<T>>>;
+	type Target = RefCell<Option<Sender<T>>>;
 	fn deref(&self) -> &Self::Target {
 		&self.0
 	}

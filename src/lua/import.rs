@@ -105,7 +105,7 @@ impl LuaShared {
 
 		match result {
 			Ok(library) => library,
-			Err(_) => panic!("Failed to load lua_shared")
+			Err(_) => panic!("Failed to load lua_shared"),
 		}
 	}
 }

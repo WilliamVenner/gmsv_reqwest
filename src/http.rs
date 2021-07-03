@@ -8,7 +8,6 @@ use crate::lua::{self, LuaReference};
 pub enum Error {
 	//#[error("unsuccessful")]
 	//Generic,
-
 	#[error("invalid url")]
 	InvalidURL,
 
@@ -27,7 +26,7 @@ pub struct HTTPRequest {
 	headers: Option<HashMap<String, String>>,
 	body: Option<Vec<u8>>,
 	content_type: String,
-	pub success: Option<LuaReference>
+	pub success: Option<LuaReference>,
 }
 impl HTTPRequest {
 	pub fn into_reqwest(self, client: &reqwest::Client) -> reqwest::Request {
@@ -74,7 +73,7 @@ impl HTTPRequest {
 						"DELETE" => reqwest::Method::DELETE,
 						"PATCH" => reqwest::Method::PATCH,
 						"OPTIONS" => reqwest::Method::OPTIONS,
-						_ => return Err(Error::UnsupportedMethod)
+						_ => return Err(Error::UnsupportedMethod),
 					}
 				}
 			};
@@ -152,9 +151,6 @@ impl HTTPRequest {
 					}
 				},
 
-				body,
-				method,
-
 				success: {
 					lua.get_field(-1, lua_string!("success"));
 					if lua.is_function(-1) {
@@ -164,6 +160,9 @@ impl HTTPRequest {
 						None
 					}
 				},
+
+				body,
+				method,
 			}
 		})
 	}

@@ -31,7 +31,9 @@ unsafe extern "C-unwind" fn request(lua: lua::State) -> LuaInt {
 		}
 	};
 
-	WORKER_CHANNEL.send(request).expect("Worker channel hung up - this is a bug with gmsv_reqwest");
+	WORKER_CHANNEL
+		.send(request)
+		.expect("Worker channel hung up - this is a bug with gmsv_reqwest");
 
 	0
 }
@@ -58,9 +60,9 @@ pub unsafe extern "C-unwind" fn gmod13_open(lua: lua::State) -> LuaInt {
 
 #[no_mangle]
 pub unsafe extern "C-unwind" fn gmod13_close(_lua: lua::State) -> LuaInt {
-	if let Some(lol) = WORKER_THREAD.take() {
-		WORKER_CHANNEL.kill();
-		lol.join().ok();
+	WORKER_CHANNEL.kill();
+	if let Some(handle) = WORKER_THREAD.take() {
+		handle.join().ok();
 	}
 	0
 }
