@@ -1,0 +1,60 @@
+name: build
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install nightly toolchain
+      run: rustup toolchain install nightly
+    - name: Add targets
+      run: rustup target add x86_64-unknown-linux-gnu && rustup target add i686-unknown-linux-gnu
+    - name: Build 64-bit
+      run: cargo build --release --target x86_64-unknown-linux-gnu
+    - name: Build 32-bit
+      run: cargo build --release --target i686-unknown-linux-gnu
+    - name: Rename binaries
+      run: |
+        mv target/i686-unknown-linux-gnu/release/libgmsv_reqwest.so target/i686-unknown-linux-gnu/release/gmsv_reqwest_linux.dll
+        mv target/x86_64-unknown-linux-gnu/release/libgmsv_reqwest.so target/x86_64-unknown-linux-gnu/release/gmsv_reqwest_linux64.dll
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          target/i686-unknown-linux-gnu/release/gmsv_reqwest_linux.dll
+          target/x86_64-unknown-linux-gnu/release/gmsv_reqwest_linux64.dll
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build_windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install nightly toolchain
+      run: rustup toolchain install nightly
+    - name: Add targets
+      run: rustup target add x86_64-pc-windows-msvc && rustup target add i686-pc-windows-msvc
+    - name: Build 64-bit
+      run: cargo build --release --target x86_64-pc-windows-msvc
+    - name: Build 32-bit
+      run: cargo build --release --target i686-pc-windows-msvc
+    - name: Rename binaries
+      run: |
+        mv target/i686-pc-windows-msvc/release/gmsv_reqwest.dll target/i686-pc-windows-msvc/release/gmsv_reqwest_win32.dll
+        mv target/x86_64-pc-windows-msvc/release/gmsv_reqwest.dll target/x86_64-pc-windows-msvc/release/gmsv_reqwest_win64.dll
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          target/i686-pc-windows-msvc/release/gmsv_reqwest_win32.dll
+          target/x86_64-pc-windows-msvc/release/gmsv_reqwest_win64.dll
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
