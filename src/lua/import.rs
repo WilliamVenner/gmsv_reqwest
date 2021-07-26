@@ -43,6 +43,7 @@ pub struct LuaShared {
 	pub lual_unref: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: LuaInt, r#ref: LuaInt)>,
 	pub lua_rawgeti: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, t: LuaInt, index: LuaInt)>,
 	pub lual_checklstring: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, arg: LuaInt, out_size: *mut LuaSize) -> LuaString>,
+	pub lua_tointeger: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, arg: LuaInt) -> LuaInt>,
 }
 unsafe impl Sync for LuaShared {}
 impl LuaShared {
@@ -82,6 +83,7 @@ impl LuaShared {
 				lual_ref: find_symbol!("luaL_ref"),
 				lual_unref: find_symbol!("luaL_unref"),
 				lua_rawgeti: find_symbol!("lua_rawgeti"),
+				lua_tointeger: find_symbol!("lua_tointeger"),
 			}
 		}
 	}

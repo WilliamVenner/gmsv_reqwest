@@ -1,4 +1,4 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, str::FromStr, time::Duration};
 
 use reqwest::Url;
 
@@ -18,6 +18,7 @@ pub struct HTTPRequest {
 	headers: Option<HashMap<String, String>>,
 	body: Option<Vec<u8>>,
 	content_type: String,
+	timeout: Option<Duration>,
 	pub success: Option<LuaReference>,
 	pub failed: Option<LuaReference>,
 }
@@ -42,6 +43,8 @@ impl HTTPRequest {
 		if !has_user_agent {
 			request = request.header("User-Agent", "Valve/Steam HTTP Client 1.0 (4000)");
 		}
+
+		request = request.timeout(self.timeout.unwrap_or_else(|| Duration::from_secs(60)));
 
 		request = request.header("Content-Type", self.content_type);
 
@@ -107,6 +110,21 @@ impl HTTPRequest {
 						}
 						lua.pop();
 						break "text/plain; charset=utf-8".to_string();
+					}
+				},
+
+				timeout: {
+					lua.get_field(-1, lua_string!("timeout"));
+					loop {
+						if !lua.is_nil(-1) {
+							let timeout = lua.to_integer(-1);
+							if timeout > 0 {
+								lua.pop();
+								break Some(Duration::from_secs(timeout as u64));
+							}
+						}
+						lua.pop();
+						break None;
 					}
 				},
 

@@ -168,6 +168,11 @@ impl LuaState {
 		(LUA_SHARED.lua_rawgeti)(*self, t, index)
 	}
 
+	#[inline]
+	pub unsafe fn to_integer(&self, arg: LuaInt) -> LuaInt {
+		(LUA_SHARED.lua_tointeger)(*self, arg)
+	}
+
 	pub unsafe fn check_binary_string(&self, arg: LuaInt) -> &[u8] {
 		let mut len: usize = 0;
 		let ptr = (LUA_SHARED.lual_checklstring)(*self, arg, &mut len);
