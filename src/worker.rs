@@ -6,7 +6,10 @@ use crate::{
 	lua::{self, LuaInt, LuaReference, LUA_REGISTRYINDEX},
 };
 
-pub type CallbackResult = (LuaReference, i32, HeaderMap, Vec<u8>);
+pub enum CallbackResult {
+	Success(LuaReference, i32, HeaderMap, Vec<u8>),
+	Failed(LuaReference, String)
+}
 
 lazy_static! {
 	pub static ref WORKER_CHANNEL: StaticSender<HTTPRequest> = StaticSender::uninit();
@@ -31,21 +34,33 @@ pub fn request_worker() {
 			while let Ok(mut request) = request_rx.recv() {
 				let tx = tx.clone();
 				tokio::spawn(async move {
-					let success = request.success.take();
+					let (success, failed) = (request.success.take(), request.failed.take());
 
-					let response: reqwest::Response = CLIENT
+					let response = CLIENT
 						.execute(request.into_reqwest(&*CLIENT))
-						.await
-						.expect("Failed to parse URI (which should have already been parsed?) This is a bug.");
+						.await;
 
-					if let Some(success) = success {
-						tx.send((
-							success,
-							response.status().as_u16() as i32,
-							response.headers().to_owned(),
-							response.bytes().await.expect("Failed to decode body bytes. This is a bug").to_vec(),
-						))
-						.expect("Response receiving channel hung up. This is a bug");
+					match response {
+						Ok(response ) => {
+							if let Some(success) = success {
+								tx.send(CallbackResult::Success(
+									success,
+									response.status().as_u16() as i32,
+									response.headers().to_owned(),
+									response.bytes().await.expect("Failed to decode body bytes. This is a bug").to_vec()
+								))
+								.expect("Response receiving channel hung up. This is a bug");
+							}
+						},
+						Err(error) => {
+							if let Some(failed) = failed {
+								tx.send(CallbackResult::Failed(
+									failed,
+									error.to_string()
+								))
+								.expect("Response receiving channel hung up. This is a bug");
+							}
+						}
 					}
 				});
 			}
@@ -56,38 +71,62 @@ pub fn request_worker() {
 }
 
 pub unsafe extern "C-unwind" fn callback_worker(lua: lua::State) -> LuaInt {
-	while let Ok((success, status, headers, body)) = CALLBACK_CHANNEL.try_recv() {
-		// Push the success callback function onto the stack
-		lua.raw_geti(LUA_REGISTRYINDEX, success);
+	while let Ok(result) = CALLBACK_CHANNEL.try_recv() {
+		match result {
+			CallbackResult::Success(callback, status, headers, body) => {
+				// Push the success callback function onto the stack
+				lua.raw_geti(LUA_REGISTRYINDEX, callback);
 
-		// Free the reference to the function
-		lua.dereference(success);
+				// Free the reference to the function
+				lua.dereference(callback);
 
-		// Push HTTP status
-		lua.push_integer(status);
+				// Push HTTP status
+				lua.push_integer(status);
 
-		// Push body
-		lua.push_string_binary(&body);
+				// Push body
+				lua.push_string_binary(&body);
 
-		// Push headers
-		lua.create_table(headers.len() as i32, headers.keys_len() as i32);
-		for (k, v) in headers {
-			if let Some(k) = k {
-				lua.push_string_binary(v.as_bytes());
-				lua.set_field(-2, lua_string!(k.as_str()));
-			} else {
-				lua.len(-1);
-				lua.push_string_binary(v.as_bytes());
-				lua.set_table(-3);
+				// Push headers
+				lua.create_table(headers.len() as i32, headers.keys_len() as i32);
+				for (k, v) in headers {
+					if let Some(k) = k {
+						lua.push_string_binary(v.as_bytes());
+						lua.set_field(-2, lua_string!(k.as_str()));
+					} else {
+						lua.len(-1);
+						lua.push_string_binary(v.as_bytes());
+						lua.set_table(-3);
+					}
+				}
+
+				// Explicitly drop everything now so a longjmp doesn't troll us
+				drop(callback);
+				drop(status);
+				drop(body);
+
+				lua.call(3, 0);
+			},
+
+			CallbackResult::Failed(callback, error) => {
+				// Push the failed callback function onto the stack
+				lua.raw_geti(LUA_REGISTRYINDEX, callback);
+
+				// Free the reference to the function
+				lua.dereference(callback);
+
+				// Push the useless error message Gmod provides
+				lua.push_string("unsuccessful");
+
+				// Push the reqwest error message
+				lua.push_string(&error);
+
+				// Explicitly drop everything now so a longjmp doesn't troll us
+				drop(callback);
+				drop(error);
+
+				lua.call(2, 0);
 			}
 		}
-
-		// Explicitly drop everything now so a longjmp doesn't troll us
-		drop(success);
-		drop(status);
-		drop(body);
-
-		lua.call(3, 0);
 	}
 
 	0

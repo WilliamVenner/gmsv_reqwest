@@ -19,6 +19,7 @@ pub struct HTTPRequest {
 	body: Option<Vec<u8>>,
 	content_type: String,
 	pub success: Option<LuaReference>,
+	pub failed: Option<LuaReference>,
 }
 impl HTTPRequest {
 	pub fn into_reqwest(self, client: &reqwest::Client) -> reqwest::Request {
@@ -139,6 +140,16 @@ impl HTTPRequest {
 
 				success: {
 					lua.get_field(-1, lua_string!("success"));
+					if lua.is_function(-1) {
+						Some(lua.reference())
+					} else {
+						lua.pop();
+						None
+					}
+				},
+
+				failed: {
+					lua.get_field(-1, lua_string!("failed"));
 					if lua.is_function(-1) {
 						Some(lua.reference())
 					} else {
