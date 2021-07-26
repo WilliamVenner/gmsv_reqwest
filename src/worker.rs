@@ -41,7 +41,7 @@ pub fn request_worker() {
 						.await;
 
 					match response {
-						Ok(response ) => {
+						Ok(response) => {
 							if let Some(success) = success {
 								tx.send(CallbackResult::Success(
 									success,
