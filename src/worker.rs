@@ -7,7 +7,7 @@ use crate::{
 };
 
 pub enum CallbackResult {
-	Success(LuaReference, i32, HeaderMap, Vec<u8>, Option<LuaReference>),
+	Success(LuaReference, LuaInt, HeaderMap, Vec<u8>, Option<LuaReference>),
 	Failed(LuaReference, String, Option<LuaReference>),
 	FreeReference(LuaReference),
 }
@@ -46,7 +46,7 @@ pub fn request_worker() {
 							if let Some(success) = success {
 								tx.send(CallbackResult::Success(
 									success,
-									response.status().as_u16() as i32,
+									response.status().as_u16() as LuaInt,
 									response.headers().to_owned(),
 									response.bytes().await.expect("Failed to decode body bytes. This is a bug").to_vec(),
 									failed
@@ -79,7 +79,7 @@ pub fn request_worker() {
 	});
 }
 
-pub unsafe extern "C-unwind" fn callback_worker(lua: lua::State) -> LuaInt {
+pub unsafe extern "C-unwind" fn callback_worker(lua: lua::State) -> i32 {
 	while let Ok(result) = CALLBACK_CHANNEL.try_recv() {
 		match result {
 			CallbackResult::Success(callback, status, headers, body, failed) => {

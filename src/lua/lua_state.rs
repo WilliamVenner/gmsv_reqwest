@@ -8,32 +8,32 @@ pub struct LuaState(*const std::ffi::c_void);
 unsafe impl Send for LuaState {}
 impl LuaState {
 	#[inline]
-	pub unsafe fn is_type(&self, index: LuaInt, r#type: LuaInt) -> bool {
+	pub unsafe fn is_type(&self, index: i32, r#type: i32) -> bool {
 		(LUA_SHARED.lua_type)(*self, index) == r#type
 	}
 
 	#[inline]
-	pub unsafe fn is_nil(&self, index: LuaInt) -> bool {
+	pub unsafe fn is_nil(&self, index: i32) -> bool {
 		(LUA_SHARED.lua_type)(*self, index) == LUA_TNIL
 	}
 
 	#[inline]
-	pub unsafe fn is_table(&self, index: LuaInt) -> bool {
+	pub unsafe fn is_table(&self, index: i32) -> bool {
 		(LUA_SHARED.lua_type)(*self, index) == LUA_TTABLE
 	}
 
 	#[inline]
-	pub unsafe fn is_function(&self, index: LuaInt) -> bool {
+	pub unsafe fn is_function(&self, index: i32) -> bool {
 		(LUA_SHARED.lua_type)(*self, index) == LUA_TFUNCTION
 	}
 
 	#[inline]
-	pub unsafe fn push_value(&self, index: LuaInt) {
+	pub unsafe fn push_value(&self, index: i32) {
 		(LUA_SHARED.lua_pushvalue)(*self, index)
 	}
 
 	#[inline]
-	pub unsafe fn get_field(&self, index: LuaInt, k: LuaString) {
+	pub unsafe fn get_field(&self, index: i32, k: LuaString) {
 		(LUA_SHARED.lua_getfield)(*self, index, k)
 	}
 
@@ -48,11 +48,11 @@ impl LuaState {
 	}
 
 	#[inline]
-	pub unsafe fn pcall(&self, nargs: LuaInt, nresults: LuaInt, errfunc: LuaInt) -> LuaInt {
+	pub unsafe fn pcall(&self, nargs: i32, nresults: i32, errfunc: i32) -> i32 {
 		(LUA_SHARED.lua_pcall)(*self, nargs, nresults, errfunc)
 	}
 
-	pub unsafe fn get_binary_string(&self, index: LuaInt) -> Option<Vec<u8>> {
+	pub unsafe fn get_binary_string(&self, index: i32) -> Option<Vec<u8>> {
 		let mut len: usize = 0;
 		let ptr = (LUA_SHARED.lua_tolstring)(*self, index, &mut len);
 
@@ -65,7 +65,7 @@ impl LuaState {
 		Some(bytes)
 	}
 
-	pub unsafe fn get_string(&self, index: LuaInt) -> Option<std::borrow::Cow<'_, str>> {
+	pub unsafe fn get_string(&self, index: i32) -> Option<std::borrow::Cow<'_, str>> {
 		let mut len: usize = 0;
 		let ptr = (LUA_SHARED.lua_tolstring)(*self, index, &mut len);
 
@@ -84,12 +84,12 @@ impl LuaState {
 	}
 
 	#[inline]
-	pub unsafe fn pop_n(&self, count: LuaInt) {
+	pub unsafe fn pop_n(&self, count: i32) {
 		self.set_top(-count - 1);
 	}
 
 	#[inline]
-	pub unsafe fn set_top(&self, index: LuaInt) {
+	pub unsafe fn set_top(&self, index: i32) {
 		(LUA_SHARED.lua_settop)(*self, index)
 	}
 
@@ -114,12 +114,12 @@ impl LuaState {
 	}
 
 	#[inline]
-	pub unsafe fn set_table(&self, index: LuaInt) {
+	pub unsafe fn set_table(&self, index: i32) {
 		(LUA_SHARED.lua_settable)(*self, index)
 	}
 
 	#[inline]
-	pub unsafe fn set_field(&self, index: LuaInt, k: LuaString) {
+	pub unsafe fn set_field(&self, index: i32, k: LuaString) {
 		(LUA_SHARED.lua_setfield)(*self, index, k)
 	}
 
@@ -134,27 +134,27 @@ impl LuaState {
 	}
 
 	#[inline]
-	pub unsafe fn call(&self, nargs: LuaInt, nresults: LuaInt) {
+	pub unsafe fn call(&self, nargs: i32, nresults: i32) {
 		(LUA_SHARED.lua_call)(*self, nargs, nresults)
 	}
 
 	#[inline]
-	pub unsafe fn create_table(&self, seq_n: LuaInt, hash_n: LuaInt) {
+	pub unsafe fn create_table(&self, seq_n: i32, hash_n: i32) {
 		(LUA_SHARED.lua_createtable)(*self, seq_n, hash_n)
 	}
 
 	#[inline]
-	pub unsafe fn len(&self, index: LuaInt) -> LuaInt {
+	pub unsafe fn len(&self, index: i32) -> i32 {
 		(LUA_SHARED.lua_objlen)(*self, index)
 	}
 
 	#[inline]
-	pub unsafe fn next(&self, index: LuaInt) -> LuaInt {
+	pub unsafe fn next(&self, index: i32) -> i32 {
 		(LUA_SHARED.lua_next)(*self, index)
 	}
 
 	#[inline]
-	pub unsafe fn reference(&self) -> LuaInt {
+	pub unsafe fn reference(&self) -> i32 {
 		(LUA_SHARED.lual_ref)(*self, LUA_REGISTRYINDEX)
 	}
 
@@ -164,46 +164,46 @@ impl LuaState {
 	}
 
 	#[inline]
-	pub unsafe fn raw_geti(&self, t: LuaInt, index: LuaInt) {
+	pub unsafe fn raw_geti(&self, t: i32, index: i32) {
 		(LUA_SHARED.lua_rawgeti)(*self, t, index)
 	}
 
 	#[inline]
-	pub unsafe fn to_integer(&self, arg: LuaInt) -> LuaInt {
+	pub unsafe fn to_integer(&self, arg: i32) -> LuaInt {
 		(LUA_SHARED.lua_tointeger)(*self, arg)
 	}
 
-	pub unsafe fn check_binary_string(&self, arg: LuaInt) -> &[u8] {
+	pub unsafe fn check_binary_string(&self, arg: i32) -> &[u8] {
 		let mut len: usize = 0;
 		let ptr = (LUA_SHARED.lual_checklstring)(*self, arg, &mut len);
 		std::slice::from_raw_parts(ptr as *const u8, len)
 	}
 
-	pub unsafe fn check_string(&self, arg: LuaInt) -> Cow<'_, str> {
+	pub unsafe fn check_string(&self, arg: i32) -> Cow<'_, str> {
 		let mut len: usize = 0;
 		let ptr = (LUA_SHARED.lual_checklstring)(*self, arg, &mut len);
 		String::from_utf8_lossy(std::slice::from_raw_parts(ptr as *const u8, len))
 	}
 
-	pub unsafe fn error<S: AsRef<str>>(&self, msg: S) -> LuaInt {
+	pub unsafe fn error<S: AsRef<str>>(&self, msg: S) -> i32 {
 		self.push_string(msg.as_ref());
 		(LUA_SHARED.lua_error)(*self)
 	}
 
 	#[cfg(debug_assertions)]
 	#[inline]
-	pub unsafe fn get_top(&self) -> LuaInt {
+	pub unsafe fn get_top(&self) -> i32 {
 		(LUA_SHARED.lua_gettop)(*self)
 	}
 
 	#[cfg(debug_assertions)]
 	#[inline]
-	pub unsafe fn lua_type(&self, index: LuaInt) -> LuaInt {
+	pub unsafe fn lua_type(&self, index: i32) -> i32 {
 		(LUA_SHARED.lua_type)(*self, index)
 	}
 
 	#[cfg(debug_assertions)]
-	pub unsafe fn lua_type_name(&self, lua_type_id: LuaInt) -> Cow<'_, str> {
+	pub unsafe fn lua_type_name(&self, lua_type_id: i32) -> Cow<'_, str> {
 		let type_str_ptr = (LUA_SHARED.lua_typename)(*self, lua_type_id);
 		let type_str = std::ffi::CStr::from_ptr(type_str_ptr);
 		type_str.to_string_lossy()

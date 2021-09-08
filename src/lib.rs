@@ -6,8 +6,6 @@ extern crate lazy_static;
 #[macro_use]
 mod lua;
 
-use lua::LuaInt;
-
 mod http;
 use http::HTTPRequest;
 
@@ -16,7 +14,7 @@ use worker::WORKER_CHANNEL;
 
 mod channels;
 
-unsafe extern "C-unwind" fn request(lua: lua::State) -> LuaInt {
+unsafe extern "C-unwind" fn request(lua: lua::State) -> i32 {
 	use lua::LUA_TTABLE;
 
 	if !lua.is_type(1, LUA_TTABLE) {
@@ -41,7 +39,7 @@ unsafe extern "C-unwind" fn request(lua: lua::State) -> LuaInt {
 static mut WORKER_THREAD: Option<std::thread::JoinHandle<()>> = None;
 
 #[no_mangle]
-pub unsafe extern "C-unwind" fn gmod13_open(lua: lua::State) -> LuaInt {
+pub unsafe extern "C-unwind" fn gmod13_open(lua: lua::State) -> i32 {
 	WORKER_THREAD.replace(std::thread::spawn(worker::request_worker));
 
 	lua.push_function(request);
@@ -59,7 +57,7 @@ pub unsafe extern "C-unwind" fn gmod13_open(lua: lua::State) -> LuaInt {
 }
 
 #[no_mangle]
-pub unsafe extern "C-unwind" fn gmod13_close(_lua: lua::State) -> LuaInt {
+pub unsafe extern "C-unwind" fn gmod13_close(_lua: lua::State) -> i32 {
 	WORKER_CHANNEL.kill();
 	if let Some(handle) = WORKER_THREAD.take() {
 		handle.join().ok();

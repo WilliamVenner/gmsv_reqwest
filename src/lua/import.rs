@@ -2,48 +2,48 @@ use libloading::{Library, Symbol};
 
 use super::State as LuaState;
 
-pub type LuaInt = std::os::raw::c_int;
+pub type LuaInt = isize;
 pub type LuaSize = usize;
 pub type LuaString = *const std::os::raw::c_char;
-pub type LuaFunction = unsafe extern "C-unwind" fn(state: LuaState) -> LuaInt;
-pub type LuaReference = LuaInt;
+pub type LuaFunction = unsafe extern "C-unwind" fn(state: LuaState) -> i32;
+pub type LuaReference = i32;
 
-pub const LUA_GLOBALSINDEX: LuaInt = -10002;
-pub const LUA_REGISTRYINDEX: LuaInt = -10000;
+pub const LUA_GLOBALSINDEX: i32 = -10002;
+pub const LUA_REGISTRYINDEX: i32 = -10000;
 
-pub const LUA_TNIL: LuaInt = 0;
-pub const LUA_TTABLE: LuaInt = 5;
-pub const LUA_TFUNCTION: LuaInt = 6;
+pub const LUA_TNIL: i32 = 0;
+pub const LUA_TTABLE: i32 = 5;
+pub const LUA_TFUNCTION: i32 = 6;
 
 lazy_static! {
 	pub static ref LUA_SHARED: LuaShared = LuaShared::import();
 }
 pub struct LuaShared {
-	pub lua_getfield: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: LuaInt, k: LuaString)>,
-	pub lua_pushvalue: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: LuaInt)>,
-	pub lua_tolstring: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: LuaInt, out_size: *mut LuaSize) -> LuaString>,
-	pub lua_pcall: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, nargs: LuaInt, nresults: LuaInt, errfunc: LuaInt) -> LuaInt>,
-	pub lua_gettop: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState) -> LuaInt>,
-	pub lua_type: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: LuaInt) -> LuaInt>,
-	pub lua_typename: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, lua_type_id: LuaInt) -> LuaString>,
-	pub lua_setfield: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: LuaInt, k: LuaString)>,
-	pub lua_call: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, nargs: LuaInt, nresults: LuaInt)>,
-	pub lua_createtable: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, narr: LuaInt, nrec: LuaInt)>,
-	pub lua_settop: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, count: LuaInt)>,
+	pub lua_getfield: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: i32, k: LuaString)>,
+	pub lua_pushvalue: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: i32)>,
+	pub lua_tolstring: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: i32, out_size: *mut LuaSize) -> LuaString>,
+	pub lua_pcall: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, nargs: i32, nresults: i32, errfunc: i32) -> i32>,
+	pub lua_gettop: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState) -> i32>,
+	pub lua_type: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: i32) -> i32>,
+	pub lua_typename: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, lua_type_id: i32) -> LuaString>,
+	pub lua_setfield: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: i32, k: LuaString)>,
+	pub lua_call: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, nargs: i32, nresults: i32)>,
+	pub lua_createtable: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, narr: i32, nrec: i32)>,
+	pub lua_settop: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, count: i32)>,
 	pub lua_pushlstring: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, data: LuaString, length: LuaSize)>,
-	pub lua_pushcclosure: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, func: LuaFunction, upvalues: LuaInt)>,
-	pub lua_settable: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: LuaInt)>,
-	pub lua_gettable: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: LuaInt)>,
-	pub lua_error: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState) -> LuaInt>,
+	pub lua_pushcclosure: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, func: LuaFunction, upvalues: i32)>,
+	pub lua_settable: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: i32)>,
+	pub lua_gettable: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: i32)>,
+	pub lua_error: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState) -> i32>,
 	pub lua_pushinteger: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, int: LuaInt)>,
 	pub lua_pushnil: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState)>,
-	pub lua_objlen: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: LuaInt) -> LuaInt>,
-	pub lua_next: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: LuaInt) -> LuaInt>,
-	pub lual_ref: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: LuaInt) -> LuaInt>,
-	pub lual_unref: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: LuaInt, r#ref: LuaInt)>,
-	pub lua_rawgeti: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, t: LuaInt, index: LuaInt)>,
-	pub lual_checklstring: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, arg: LuaInt, out_size: *mut LuaSize) -> LuaString>,
-	pub lua_tointeger: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, arg: LuaInt) -> LuaInt>,
+	pub lua_objlen: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: i32) -> i32>,
+	pub lua_next: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: i32) -> i32>,
+	pub lual_ref: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: i32) -> i32>,
+	pub lual_unref: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, index: i32, r#ref: i32)>,
+	pub lua_rawgeti: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, t: i32, index: i32)>,
+	pub lual_checklstring: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, arg: i32, out_size: *mut LuaSize) -> LuaString>,
+	pub lua_tointeger: Symbol<'static, unsafe extern "C-unwind" fn(state: LuaState, arg: i32) -> LuaInt>,
 }
 unsafe impl Sync for LuaShared {}
 impl LuaShared {
