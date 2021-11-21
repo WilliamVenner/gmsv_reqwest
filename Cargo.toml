@@ -15,12 +15,10 @@ codegen-units = 1
 opt-level = "z"
 
 [dependencies]
+gmod = { version = "9.0.1", default-features = false }
 reqwest = { version = "0.11.4", default-features = false, features = ["rustls-tls-native-roots"] }
 tokio = { version = "1.7.1", features = ["rt", "macros"] }
-libloading = "0.7.0"
-cstr = "0.2.8"
 crossbeam = "0.8.1"
 thiserror = "1.0.25"
 magic_static = "2.0.1"
 singlyton = "1.2.0"
-lazy_static = "1.4.0"

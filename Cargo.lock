@@ -221,13 +221,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "gmod"
+version = "9.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f564164f3a1eb629ba034fcc2732711123854b48ceba48631308ab48766ab250"
+dependencies = [
+ "cstr",
+ "gmod-macros",
+ "lazy_static",
+ "libloading",
+]
+
+[[package]]
+name = "gmod-macros"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b791745998b09a16260e803bb0cca1a641e9b70e2aae94d7a485d34259b29279"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "gmsv_reqwest"
 version = "0.3.0"
 dependencies = [
  "crossbeam",
- "cstr",
- "lazy_static",
- "libloading",
+ "gmod",
  "magic_static",
  "reqwest",
  "singlyton",

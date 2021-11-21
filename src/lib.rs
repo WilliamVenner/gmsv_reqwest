@@ -1,13 +1,10 @@
 #![feature(c_unwind)]
 
 #[macro_use]
-extern crate lazy_static;
+extern crate gmod;
 
 #[macro_use]
 extern crate magic_static;
-
-#[macro_use]
-mod lua;
 
 mod http;
 use http::HTTPRequest;
@@ -17,19 +14,14 @@ use worker::WORKER_CHANNEL;
 
 mod tls;
 
-unsafe extern "C-unwind" fn request(lua: lua::State) -> i32 {
-	use lua::LUA_TTABLE;
-
-	if !lua.is_type(1, LUA_TTABLE) {
+unsafe extern "C-unwind" fn request(lua: gmod::lua::State) -> i32 {
+	if !lua.lua_type(1) == gmod::lua::LUA_TTABLE {
 		return 0;
 	}
 
 	let request = match HTTPRequest::from_lua_state(lua) {
 		Ok(request) => request,
-		Err(error) => {
-			lua.error(error.to_string());
-			return 0;
-		}
+		Err(error) => lua.error(error.to_string())
 	};
 
 	WORKER_CHANNEL.get()
@@ -41,11 +33,11 @@ unsafe extern "C-unwind" fn request(lua: lua::State) -> i32 {
 
 static WORKER_THREAD: singlyton::SingletonOption<std::thread::JoinHandle<()>> = singlyton::SingletonOption::new();
 
-#[no_mangle]
+#[gmod13_open]
 #[magic_static::main(
 	worker::CLIENT
 )]
-pub unsafe extern "C-unwind" fn gmod13_open(lua: lua::State) -> i32 {
+unsafe fn gmod13_open(lua: gmod::lua::State) -> i32 {
 	WORKER_THREAD.replace(std::thread::spawn(worker::init));
 
 	lua.push_function(request);
@@ -62,8 +54,8 @@ pub unsafe extern "C-unwind" fn gmod13_open(lua: lua::State) -> i32 {
 	0
 }
 
-#[no_mangle]
-pub unsafe extern "C-unwind" fn gmod13_close(_lua: lua::State) -> i32 {
+#[gmod13_close]
+fn gmod13_close(_lua: gmod::lua::State) -> i32 {
 	if let Some(handle) = WORKER_THREAD.take() {
 		handle.join().ok();
 	}

@@ -1,11 +1,8 @@
 use reqwest::{Client, ClientBuilder, header::HeaderMap};
 use singlyton::SingletonUninit;
+use gmod::lua::{LuaReference, LuaInt};
 
-use crate::{
-	http::HTTPRequest,
-	lua::{self, LuaInt, LuaReference, LUA_REGISTRYINDEX},
-	tls
-};
+use crate::{http::HTTPRequest, tls};
 
 pub enum CallbackResult {
 	Success(LuaReference, LuaInt, HeaderMap, Vec<u8>, Option<LuaReference>),
@@ -96,7 +93,7 @@ pub fn init() {
 	});
 }
 
-pub unsafe extern "C-unwind" fn callback_worker(lua: lua::State) -> i32 {
+pub unsafe extern "C-unwind" fn callback_worker(lua: gmod::lua::State) -> i32 {
 	while let Ok(result) = CALLBACK_CHANNEL.get().try_recv() {
 		match result {
 			CallbackResult::Success(callback, status, headers, body, failed) => {
@@ -106,7 +103,7 @@ pub unsafe extern "C-unwind" fn callback_worker(lua: lua::State) -> i32 {
 				}
 
 				// Push the success callback function onto the stack
-				lua.raw_geti(LUA_REGISTRYINDEX, callback);
+				lua.from_reference(callback);
 
 				// Free the reference to the function
 				lua.dereference(callback);
@@ -115,17 +112,20 @@ pub unsafe extern "C-unwind" fn callback_worker(lua: lua::State) -> i32 {
 				lua.push_integer(status);
 
 				// Push body
-				lua.push_string_binary(&body);
+				lua.push_binary_string(&body);
 
 				// Push headers
 				lua.create_table(headers.len() as i32, headers.keys_len() as i32);
 				for (k, v) in headers {
 					if let Some(k) = k {
-						lua.push_string_binary(v.as_bytes());
-						lua.set_field(-2, lua_string!(k.as_str()));
+						let mut k = k.to_string();
+						k.push('\0');
+
+						lua.push_binary_string(v.as_bytes());
+						lua.set_field(-2, k.as_ptr() as *const _);
 					} else {
 						lua.push_integer(lua.len(-1) as _);
-						lua.push_string_binary(v.as_bytes());
+						lua.push_binary_string(v.as_bytes());
 						lua.set_table(-3);
 					}
 				}
@@ -145,7 +145,7 @@ pub unsafe extern "C-unwind" fn callback_worker(lua: lua::State) -> i32 {
 				}
 
 				// Push the failed callback function onto the stack
-				lua.raw_geti(LUA_REGISTRYINDEX, callback);
+				lua.from_reference(callback);
 
 				// Free the reference to the function
 				lua.dereference(callback);

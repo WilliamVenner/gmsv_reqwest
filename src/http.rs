@@ -1,8 +1,7 @@
 use std::{collections::HashMap, str::FromStr, time::Duration};
 
+use gmod::lua::LuaReference;
 use reqwest::Url;
-
-use crate::lua::{self, LuaReference};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -51,7 +50,7 @@ impl HTTPRequest {
 		request.build().expect("Failed to build reqwest::Request. This is a bug.")
 	}
 
-	pub fn from_lua_state(lua: lua::State) -> Result<Self, Error> {
+	pub fn from_lua_state(lua: gmod::lua::State) -> Result<Self, Error> {
 		Ok(unsafe {
 			let method = {
 				lua.get_field(-1, lua_string!("method"));
@@ -184,10 +183,10 @@ impl HTTPRequest {
 }
 
 trait FromLuaTable {
-	fn from_lua_table(lua: lua::State) -> Self;
+	fn from_lua_table(lua: gmod::lua::State) -> Self;
 }
 impl FromLuaTable for HashMap<String, String> {
-	fn from_lua_table(lua: lua::State) -> Self {
+	fn from_lua_table(lua: gmod::lua::State) -> Self {
 		let mut hash_map = HashMap::new();
 		unsafe {
 			lua.push_nil();
