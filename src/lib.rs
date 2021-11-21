@@ -4,6 +4,9 @@
 extern crate lazy_static;
 
 #[macro_use]
+extern crate magic_static;
+
+#[macro_use]
 mod lua;
 
 mod http;
@@ -12,7 +15,6 @@ use http::HTTPRequest;
 mod worker;
 use worker::WORKER_CHANNEL;
 
-mod channels;
 mod tls;
 
 unsafe extern "C-unwind" fn request(lua: lua::State) -> i32 {
@@ -30,16 +32,19 @@ unsafe extern "C-unwind" fn request(lua: lua::State) -> i32 {
 		}
 	};
 
-	WORKER_CHANNEL
+	WORKER_CHANNEL.get()
 		.send(request)
 		.expect("Worker channel hung up - this is a bug with gmsv_reqwest");
 
 	0
 }
 
-static mut WORKER_THREAD: Option<std::thread::JoinHandle<()>> = None;
+static WORKER_THREAD: singlyton::SingletonOption<std::thread::JoinHandle<()>> = singlyton::SingletonOption::new();
 
 #[no_mangle]
+#[magic_static::main(
+	worker::CLIENT
+)]
 pub unsafe extern "C-unwind" fn gmod13_open(lua: lua::State) -> i32 {
 	WORKER_THREAD.replace(std::thread::spawn(worker::init));
 
@@ -59,7 +64,6 @@ pub unsafe extern "C-unwind" fn gmod13_open(lua: lua::State) -> i32 {
 
 #[no_mangle]
 pub unsafe extern "C-unwind" fn gmod13_close(_lua: lua::State) -> i32 {
-	WORKER_CHANNEL.kill();
 	if let Some(handle) = WORKER_THREAD.take() {
 		handle.join().ok();
 	}

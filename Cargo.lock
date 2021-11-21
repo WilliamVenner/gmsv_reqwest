@@ -228,7 +228,9 @@ dependencies = [
  "cstr",
  "lazy_static",
  "libloading",
+ "magic_static",
  "reqwest",
+ "singlyton",
  "thiserror",
  "tokio",
 ]
@@ -402,6 +404,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51b9bbe6c47d51fc3e1a9b945965946b4c44142ab8792c50835a980d362c2710"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "magic_static"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "582725b4eca14b8bfd8e773c13027a41e52423ae4602cc334147ac577b95a20b"
+dependencies = [
+ "magic_static_macro",
+]
+
+[[package]]
+name = "magic_static_macro"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c1487c9363c1f031e2ede5b94cbdbacf4636c94cba95bb22032019b68390f0b"
+dependencies = [
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -680,6 +701,12 @@ dependencies = [
  "ryu",
  "serde",
 ]
+
+[[package]]
+name = "singlyton"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "217a83a62191ee751e6aa9a6de1e5fe5125ef45e5e9c406925df819f2dbc85f1"
 
 [[package]]
 name = "slab"

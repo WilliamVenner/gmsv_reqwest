@@ -1,7 +1,7 @@
 use reqwest::{Client, ClientBuilder, header::HeaderMap};
+use singlyton::SingletonUninit;
 
 use crate::{
-	channels::{StaticReceiver, StaticSender},
 	http::HTTPRequest,
 	lua::{self, LuaInt, LuaReference, LUA_REGISTRYINDEX},
 	tls
@@ -26,11 +26,11 @@ fn create_client() -> Client {
 	client_builder.build().expect("Failed to initialize reqwest client")
 }
 
-lazy_static! {
-	pub static ref WORKER_CHANNEL: StaticSender<HTTPRequest> = StaticSender::uninit();
-	pub static ref CALLBACK_CHANNEL: StaticReceiver<CallbackResult> = StaticReceiver::uninit();
-	static ref CLIENT: reqwest::Client = create_client();
-}
+pub static WORKER_CHANNEL: SingletonUninit<crossbeam::channel::Sender<HTTPRequest>> = SingletonUninit::uninit();
+pub static CALLBACK_CHANNEL: SingletonUninit<crossbeam::channel::Receiver<CallbackResult>> = SingletonUninit::uninit();
+
+#[magic_static]
+pub static CLIENT: reqwest::Client = create_client();
 
 async fn process(tx: crossbeam::channel::Sender<CallbackResult>, mut request: HTTPRequest) {
 	let (success, failed) = (request.success.take(), request.failed.take());
@@ -73,10 +73,10 @@ async fn process(tx: crossbeam::channel::Sender<CallbackResult>, mut request: HT
 
 pub fn init() {
 	let (tx, request_rx) = crossbeam::channel::unbounded::<HTTPRequest>();
-	WORKER_CHANNEL.borrow_mut().replace(tx);
+	WORKER_CHANNEL.init(tx);
 
 	let (tx, response_rx) = crossbeam::channel::unbounded::<CallbackResult>();
-	unsafe { CALLBACK_CHANNEL.borrow_mut().as_mut_ptr().write(response_rx) };
+	CALLBACK_CHANNEL.init(response_rx);
 
 	let runtime = tokio::runtime::Builder::new_current_thread()
 		.enable_io()
@@ -97,7 +97,7 @@ pub fn init() {
 }
 
 pub unsafe extern "C-unwind" fn callback_worker(lua: lua::State) -> i32 {
-	while let Ok(result) = CALLBACK_CHANNEL.try_recv() {
+	while let Ok(result) = CALLBACK_CHANNEL.get().try_recv() {
 		match result {
 			CallbackResult::Success(callback, status, headers, body, failed) => {
 				// Get rid of the failure callback from the registry if it exists
