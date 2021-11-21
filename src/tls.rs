@@ -4,21 +4,16 @@ use reqwest::Certificate;
 
 const CUSTOM_ROOT_CERT_DIR: &'static str = "garrysmod/tls_certificates";
 
-#[derive(Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum CertificateError {
+	#[error("invalid certificate extension: {0:?}")]
 	InvalidExtension(Option<String>),
-	Other(reqwest::Error),
-	IoError(std::io::Error),
-}
-impl From<reqwest::Error> for CertificateError {
-	fn from(err: reqwest::Error) -> Self {
-		CertificateError::Other(err)
-	}
-}
-impl From<std::io::Error> for CertificateError {
-	fn from(err: std::io::Error) -> Self {
-		CertificateError::IoError(err)
-	}
+
+	#[error("reqwest error: {0:#?}")]
+	Other(#[from] reqwest::Error),
+
+	#[error("io error: {0:?}")]
+	IoError(#[from] std::io::Error),
 }
 
 fn get_cert_from_file<P: AsRef<Path>>(path: P) -> Result<Certificate, CertificateError> {
@@ -53,7 +48,7 @@ pub fn get_loadable_certificates() -> Result<Vec<Certificate>, std::io::Error> {
 			.filter_map(|entry| match get_cert_from_file(entry.path()) {
 				Ok(cert) => Some(cert),
 				Err(err) => {
-					eprintln!("[gmsv_reqwest] Error loading certificate \"{:?}\": {:#?}", entry.path().file_name(), err);
+					eprintln!("[gmsv_reqwest] Error loading certificate \"{:?}\": {}", entry.path().file_name(), err);
 					None
 				}
 			})
