@@ -1,9 +1,10 @@
-use reqwest::header::HeaderMap;
+use reqwest::{Client, ClientBuilder, header::HeaderMap};
 
 use crate::{
 	channels::{StaticReceiver, StaticSender},
 	http::HTTPRequest,
 	lua::{self, LuaInt, LuaReference, LUA_REGISTRYINDEX},
+	tls
 };
 
 pub enum CallbackResult {
@@ -12,11 +13,25 @@ pub enum CallbackResult {
 	FreeReference(LuaReference),
 }
 
+fn create_client() -> Client {
+	let mut client_builder = ClientBuilder::new();
+
+	match tls::get_loadable_certificates() {
+		Ok(certs) => for cert in certs {
+			client_builder = client_builder.add_root_certificate(cert);
+		},
+		Err(err) => eprintln!("[gmsv_reqwest] Unable to load TLS Certificates: {}", err)
+	}
+
+	client_builder.build().expect("Failed to initialize reqwest client")
+}
+
 lazy_static! {
 	pub static ref WORKER_CHANNEL: StaticSender<HTTPRequest> = StaticSender::uninit();
 	pub static ref CALLBACK_CHANNEL: StaticReceiver<CallbackResult> = StaticReceiver::uninit();
-	static ref CLIENT: reqwest::Client = reqwest::Client::new();
+	static ref CLIENT: reqwest::Client = create_client();
 }
+
 pub fn request_worker() {
 	let (tx, request_rx) = crossbeam::channel::unbounded::<HTTPRequest>();
 	WORKER_CHANNEL.borrow_mut().replace(tx);

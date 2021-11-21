@@ -13,6 +13,7 @@ mod worker;
 use worker::WORKER_CHANNEL;
 
 mod channels;
+mod tls;
 
 unsafe extern "C-unwind" fn request(lua: lua::State) -> i32 {
 	use lua::LUA_TTABLE;
