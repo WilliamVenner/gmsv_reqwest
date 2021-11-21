@@ -10,9 +10,9 @@ name = "gmsv_reqwest"
 crate-type = ["cdylib"]
 
 [profile.release]
-lto = 'thin'
 codegen-units = 1
-opt-level = 's'
+opt-level = "s"
+lto = "thin"
 
 [dependencies]
 gmod = { version = "9.0.1", default-features = false }
