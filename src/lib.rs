@@ -65,9 +65,24 @@ unsafe fn gmod13_open(lua: gmod::lua::State) -> i32 {
 }
 
 #[gmod13_close]
-fn gmod13_close(_lua: gmod::lua::State) -> i32 {
+unsafe fn gmod13_close(lua: gmod::lua::State) -> i32 {
+	// Remove the worker hook
+	lua.get_global(lua_string!("hook"));
+	lua.get_field(-1, lua_string!("Remove"));
+	lua.push_string("Think");
+	lua.push_string("reqwest");
+	lua.call(2, 0);
+	lua.pop();
+
+	{
+		// Drop the channels, allowing us to join with the worker thread
+		worker::CALLBACK_CHANNEL.take();
+		worker::WORKER_CHANNEL.take();
+	}
+
 	if let Some(handle) = worker::WORKER_THREAD.take() {
 		handle.join().ok();
 	}
+
 	0
 }

@@ -1,7 +1,7 @@
 use std::sync::{Arc, Barrier};
 
 use reqwest::{Client, ClientBuilder, header::HeaderMap};
-use singlyton::{SingletonOption, SingletonUninit};
+use singlyton::SingletonOption;
 use gmod::lua::{LuaReference, LuaInt};
 
 use crate::{http::HTTPRequest, tls};
@@ -26,8 +26,8 @@ fn create_client() -> Client {
 }
 
 pub static WORKER_THREAD: SingletonOption<std::thread::JoinHandle<()>> = SingletonOption::new();
-pub static WORKER_CHANNEL: SingletonUninit<crossbeam::channel::Sender<HTTPRequest>> = SingletonUninit::uninit();
-pub static CALLBACK_CHANNEL: SingletonUninit<crossbeam::channel::Receiver<CallbackResult>> = SingletonUninit::uninit();
+pub static WORKER_CHANNEL: SingletonOption<crossbeam::channel::Sender<HTTPRequest>> = SingletonOption::new();
+pub static CALLBACK_CHANNEL: SingletonOption<crossbeam::channel::Receiver<CallbackResult>> = SingletonOption::new();
 
 #[magic_static]
 pub static CLIENT: reqwest::Client = create_client();
@@ -73,10 +73,10 @@ async fn process(tx: crossbeam::channel::Sender<CallbackResult>, mut request: HT
 
 pub fn init(barrier: Arc<Barrier>) {
 	let (tx, request_rx) = crossbeam::channel::unbounded::<HTTPRequest>();
-	WORKER_CHANNEL.init(tx);
+	WORKER_CHANNEL.replace(tx);
 
 	let (tx, response_rx) = crossbeam::channel::unbounded::<CallbackResult>();
-	CALLBACK_CHANNEL.init(response_rx);
+	CALLBACK_CHANNEL.replace(response_rx);
 
 	barrier.wait();
 
