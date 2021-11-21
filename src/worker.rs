@@ -32,7 +32,46 @@ lazy_static! {
 	static ref CLIENT: reqwest::Client = create_client();
 }
 
-pub fn request_worker() {
+async fn process(tx: crossbeam::channel::Sender<CallbackResult>, mut request: HTTPRequest) {
+	let (success, failed) = (request.success.take(), request.failed.take());
+
+	let response = CLIENT
+		.execute(request.into_reqwest(&*CLIENT))
+		.await;
+
+	match response {
+		Ok(response) => {
+			if let Some(success) = success {
+				tx.send(CallbackResult::Success(
+					success,
+					response.status().as_u16() as LuaInt,
+					response.headers().to_owned(),
+					response.bytes().await.expect("Failed to decode body bytes. This is a bug").to_vec(),
+					failed
+				))
+				.expect("Response receiving channel hung up. This is a bug");
+			} if let Some(failed) = failed {
+				tx.send(CallbackResult::FreeReference(failed))
+				.expect("Response receiving channel hung up. This is a bug");
+			}
+		},
+		Err(error) => {
+			if let Some(failed) = failed {
+				tx.send(CallbackResult::Failed(
+					failed,
+					error.to_string(),
+					success
+				))
+				.expect("Response receiving channel hung up. This is a bug");
+			} else if let Some(success) = success {
+				tx.send(CallbackResult::FreeReference(success))
+				.expect("Response receiving channel hung up. This is a bug");
+			}
+		}
+	}
+}
+
+pub fn init() {
 	let (tx, request_rx) = crossbeam::channel::unbounded::<HTTPRequest>();
 	WORKER_CHANNEL.borrow_mut().replace(tx);
 
@@ -47,46 +86,9 @@ pub fn request_worker() {
 
 	runtime.block_on(async move {
 		tokio::task::spawn_blocking(move || {
-			while let Ok(mut request) = request_rx.recv() {
+			while let Ok(request) = request_rx.recv() {
 				let tx = tx.clone();
-				tokio::spawn(async move {
-					let (success, failed) = (request.success.take(), request.failed.take());
-
-					let response = CLIENT
-						.execute(request.into_reqwest(&*CLIENT))
-						.await;
-
-					match response {
-						Ok(response) => {
-							if let Some(success) = success {
-								tx.send(CallbackResult::Success(
-									success,
-									response.status().as_u16() as LuaInt,
-									response.headers().to_owned(),
-									response.bytes().await.expect("Failed to decode body bytes. This is a bug").to_vec(),
-									failed
-								))
-								.expect("Response receiving channel hung up. This is a bug");
-							} if let Some(failed) = failed {
-								tx.send(CallbackResult::FreeReference(failed))
-								.expect("Response receiving channel hung up. This is a bug");
-							}
-						},
-						Err(error) => {
-							if let Some(failed) = failed {
-								tx.send(CallbackResult::Failed(
-									failed,
-									error.to_string(),
-									success
-								))
-								.expect("Response receiving channel hung up. This is a bug");
-							} else if let Some(success) = success {
-								tx.send(CallbackResult::FreeReference(success))
-								.expect("Response receiving channel hung up. This is a bug");
-							}
-						}
-					}
-				});
+				tokio::spawn(process(tx, request));
 			}
 		})
 		.await

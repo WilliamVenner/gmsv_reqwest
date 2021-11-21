@@ -41,7 +41,7 @@ static mut WORKER_THREAD: Option<std::thread::JoinHandle<()>> = None;
 
 #[no_mangle]
 pub unsafe extern "C-unwind" fn gmod13_open(lua: lua::State) -> i32 {
-	WORKER_THREAD.replace(std::thread::spawn(worker::request_worker));
+	WORKER_THREAD.replace(std::thread::spawn(worker::init));
 
 	lua.push_function(request);
 	lua.set_global(lua_string!("reqwest"));
