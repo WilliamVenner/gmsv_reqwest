@@ -138,7 +138,7 @@ pub unsafe extern "C-unwind" fn callback_worker(lua: gmod::lua::State) -> i32 {
 				drop(status);
 				drop(body);
 
-				lua.call(3, 0);
+				lua.pcall_ignore(3, 0);
 			},
 
 			CallbackResult::Failed(callback, error, success) => {
@@ -163,7 +163,7 @@ pub unsafe extern "C-unwind" fn callback_worker(lua: gmod::lua::State) -> i32 {
 				drop(callback);
 				drop(error);
 
-				lua.call(2, 0);
+				lua.pcall_ignore(2, 0);
 			},
 
 			CallbackResult::FreeReference(reference) => {
