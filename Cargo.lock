@@ -726,8 +726,6 @@ dependencies = [
 [[package]]
 name = "singlyton"
 version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "217a83a62191ee751e6aa9a6de1e5fe5125ef45e5e9c406925df819f2dbc85f1"
 
 [[package]]
 name = "slab"

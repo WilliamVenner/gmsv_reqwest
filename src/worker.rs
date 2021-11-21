@@ -1,5 +1,7 @@
+use std::sync::{Arc, Barrier};
+
 use reqwest::{Client, ClientBuilder, header::HeaderMap};
-use singlyton::SingletonUninit;
+use singlyton::{SingletonOption, SingletonUninit};
 use gmod::lua::{LuaReference, LuaInt};
 
 use crate::{http::HTTPRequest, tls};
@@ -23,6 +25,7 @@ fn create_client() -> Client {
 	client_builder.build().expect("Failed to initialize reqwest client")
 }
 
+pub static WORKER_THREAD: SingletonOption<std::thread::JoinHandle<()>> = SingletonOption::new();
 pub static WORKER_CHANNEL: SingletonUninit<crossbeam::channel::Sender<HTTPRequest>> = SingletonUninit::uninit();
 pub static CALLBACK_CHANNEL: SingletonUninit<crossbeam::channel::Receiver<CallbackResult>> = SingletonUninit::uninit();
 
@@ -68,12 +71,14 @@ async fn process(tx: crossbeam::channel::Sender<CallbackResult>, mut request: HT
 	}
 }
 
-pub fn init() {
+pub fn init(barrier: Arc<Barrier>) {
 	let (tx, request_rx) = crossbeam::channel::unbounded::<HTTPRequest>();
 	WORKER_CHANNEL.init(tx);
 
 	let (tx, response_rx) = crossbeam::channel::unbounded::<CallbackResult>();
 	CALLBACK_CHANNEL.init(response_rx);
+
+	barrier.wait();
 
 	let runtime = tokio::runtime::Builder::new_current_thread()
 		.enable_io()
@@ -87,9 +92,7 @@ pub fn init() {
 				let tx = tx.clone();
 				tokio::spawn(process(tx, request));
 			}
-		})
-		.await
-		.expect("Error in reqwest worker");
+		}).await.expect("Failed to join thread")
 	});
 }
 

@@ -6,16 +6,17 @@ extern crate gmod;
 #[macro_use]
 extern crate magic_static;
 
+mod tls;
+
 mod http;
 use http::HTTPRequest;
 
 mod worker;
-use worker::WORKER_CHANNEL;
-
-mod tls;
 
 unsafe extern "C-unwind" fn request(lua: gmod::lua::State) -> i32 {
-	if !lua.lua_type(1) == gmod::lua::LUA_TTABLE {
+	// lua_run require("reqwest") reqwest({ url = "https://google.com", success = function(...) PrintTable({...}) end, failed = function(...) PrintTable({...}) end })
+
+	if lua.lua_type(1) != gmod::lua::LUA_TTABLE {
 		return 0;
 	}
 
@@ -24,21 +25,30 @@ unsafe extern "C-unwind" fn request(lua: gmod::lua::State) -> i32 {
 		Err(error) => lua.error(error.to_string())
 	};
 
-	WORKER_CHANNEL.get()
+	worker::WORKER_CHANNEL.get()
 		.send(request)
 		.expect("Worker channel hung up - this is a bug with gmsv_reqwest");
 
 	0
 }
 
-static WORKER_THREAD: singlyton::SingletonOption<std::thread::JoinHandle<()>> = singlyton::SingletonOption::new();
-
 #[gmod13_open]
 #[magic_static::main(
 	worker::CLIENT
 )]
 unsafe fn gmod13_open(lua: gmod::lua::State) -> i32 {
-	WORKER_THREAD.replace(std::thread::spawn(worker::init));
+	{
+		use std::sync::{Arc, Barrier};
+
+		let barrier = Arc::new(Barrier::new(2));
+		let barrier_ref = barrier.clone();
+
+		worker::WORKER_THREAD.replace(std::thread::spawn(move || {
+			worker::init(barrier_ref)
+		}));
+
+		barrier.wait();
+	}
 
 	lua.push_function(request);
 	lua.set_global(lua_string!("reqwest"));
@@ -56,7 +66,7 @@ unsafe fn gmod13_open(lua: gmod::lua::State) -> i32 {
 
 #[gmod13_close]
 fn gmod13_close(_lua: gmod::lua::State) -> i32 {
-	if let Some(handle) = WORKER_THREAD.take() {
+	if let Some(handle) = worker::WORKER_THREAD.take() {
 		handle.join().ok();
 	}
 	0
