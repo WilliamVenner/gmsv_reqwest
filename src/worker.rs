@@ -1,4 +1,5 @@
-use reqwest::header::HeaderMap;
+use std::fs::{read, DirEntry};
+use reqwest::{Certificate, Client, ClientBuilder, header::HeaderMap};
 
 use crate::{
 	channels::{StaticReceiver, StaticSender},
@@ -12,12 +13,92 @@ pub enum CallbackResult {
 	FreeReference(LuaReference),
 }
 
+
+fn create_client() -> Client{
+	let certs = get_loadable_certificates();
+
+	let mut client_builder = ClientBuilder::new();
+	for cert in certs{
+		client_builder = client_builder.add_root_certificate(cert);
+	}
+
+	return client_builder.build().unwrap();
+}
+
+
 lazy_static! {
 	pub static ref WORKER_CHANNEL: StaticSender<HTTPRequest> = StaticSender::uninit();
 	pub static ref CALLBACK_CHANNEL: StaticReceiver<CallbackResult> = StaticReceiver::uninit();
-	static ref CLIENT: reqwest::Client = reqwest::Client::new();
+	static ref CLIENT: reqwest::Client = create_client();
 }
+
+static CUSTOM_ROOT_CERT_DIR: &str = "./garrysmod/tls_certificates/";
+
+fn get_cert_from_file(path_ref: DirEntry) -> Result<Certificate, String>{
+	let path = path_ref.path();
+
+	let ext_opt = path.extension();
+	if ext_opt.is_some(){
+		let extension = ext_opt.unwrap();
+		let file = read(&path);
+
+		if file.is_err() {
+			return Err(format!("[Reqwest] Unable to open file: {}", path.display()));
+		}
+		
+		let file_data: &[u8] = &file.unwrap()[..];
+		
+		let data: Result<Certificate, reqwest::Error>;
+
+		match extension.to_str().unwrap() {
+			"pem" => {
+				data = Certificate::from_pem(file_data);
+			},
+			"der" => {
+				data = Certificate::from_der(file_data);
+			},
+			_ =>{
+				return Err(format!("[Reqwest] file extension incorrect for: {:?}", path.display()));
+			}
+		}
+
+		match data {
+			Ok(cert) => {
+				println!("[Reqwest] Loaded Certificate: {:?}", path.display());
+				return Ok(cert);
+			}
+			Err(error) =>{
+				return Err(format!("[Reqwest] got error while parsing certificate: {:?} Error: {:?}", path.display(), error.to_string()))
+			}
+		}
+	}else{
+		return Err(format!("[Reqwest] No file extension for certificate: {:?}", path.display()));
+	}
+}
+
+fn get_loadable_certificates() -> Vec<Certificate> {
+	// thank you billy for improving this :)
+    std::fs::read_dir(CUSTOM_ROOT_CERT_DIR)
+    .map(|dir| {
+        dir.filter_map(|entry| entry.ok()).filter_map(|entry| {
+            match get_cert_from_file(entry) {
+                Ok(cert) => Some(cert),
+                Err(err) => {
+                    eprintln!("{}", err);
+                    None
+                }
+            }
+        }).collect::<Vec<Certificate>>()
+    })
+    .map_err(|err| {
+        println!("[Reqwest] Unable to load TLS Certificates: {}", err);
+        err
+    })
+    .unwrap_or_default()
+}
+
 pub fn request_worker() {
+
 	let (tx, request_rx) = crossbeam::channel::unbounded::<HTTPRequest>();
 	WORKER_CHANNEL.borrow_mut().replace(tx);
 
