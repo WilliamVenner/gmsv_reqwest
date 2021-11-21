@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 [profile.release]
 lto = 'thin'
 codegen-units = 1
-opt-level = "z"
+opt-level = 's'
 
 [dependencies]
 gmod = { version = "9.0.1", default-features = false }
