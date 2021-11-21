@@ -4,7 +4,7 @@ This module is a drop-in replacement for Garry's Mod's [`HTTP`](https://wiki.fac
 
 The module uses the [`reqwest`](https://docs.rs/reqwest/*/reqwest/) crate for dispatching HTTP requests, [`tokio`](https://tokio.rs/) crate for async/thread scheduling runtime and the [`rustls`](https://github.com/ctz/rustls) crate for SSL/TLS.
 
-This module was written in Rust and serves as a decent example on how to write a Garry's Mod binary module in Rust. (Thank you [Willox](https://github.com/willox) for the base!)
+This module was written in Rust and serves as a decent example on how to write a Garry's Mod binary module in Rust, using the [`gmod`](https://github.com/WilliamVenner/gmod-rs) crate.
 
 ## Installation
 
