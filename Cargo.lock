@@ -251,7 +251,7 @@ dependencies = [
 
 [[package]]
 name = "gmsv_reqwest"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "crossbeam",
  "gmod",
@@ -435,18 +435,18 @@ dependencies = [
 
 [[package]]
 name = "magic_static"
-version = "2.0.1"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "582725b4eca14b8bfd8e773c13027a41e52423ae4602cc334147ac577b95a20b"
+checksum = "b4d7fc3bb73aade3b26b878cea3e49e9143064a6ac7541b74fc1c3365a3162f4"
 dependencies = [
  "magic_static_macro",
 ]
 
 [[package]]
 name = "magic_static_macro"
-version = "2.0.1"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c1487c9363c1f031e2ede5b94cbdbacf4636c94cba95bb22032019b68390f0b"
+checksum = "a98ec7012afce91a937be58d850372ca42a62cf56238704da2ee72f2e6745fe7"
 dependencies = [
  "quote",
  "syn",

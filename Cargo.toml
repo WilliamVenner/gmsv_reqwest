@@ -1,6 +1,6 @@
 [package]
 name = "gmsv_reqwest"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["William Venner <william@venner.io>"]
 edition = "2018"
 publish = false
@@ -20,5 +20,5 @@ reqwest = { version = "0.11.4", default-features = false, features = ["rustls-tl
 tokio = { version = "1.7.1", features = ["rt", "macros"] }
 crossbeam = "0.8.1"
 thiserror = "1.0.25"
-magic_static = "2.0.1"
+magic_static = "3.0.0"
 singlyton = "2.0.0"
