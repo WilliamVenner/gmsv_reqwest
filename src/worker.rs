@@ -50,7 +50,7 @@ async fn process(tx: crossbeam::channel::Sender<CallbackResult>, mut request: HT
 					failed
 				))
 				.expect("Response receiving channel hung up. This is a bug");
-			} if let Some(failed) = failed {
+			} else if let Some(failed) = failed {
 				tx.send(CallbackResult::FreeReference(failed))
 				.expect("Response receiving channel hung up. This is a bug");
 			}
