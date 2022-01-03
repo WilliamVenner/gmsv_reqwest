@@ -185,30 +185,33 @@ impl HTTPRequest {
 trait FromLuaTable {
 	fn from_lua_table(lua: gmod::lua::State) -> Self;
 }
-impl FromLuaTable for HashMap<String, String> {
+impl FromLuaTable for std::collections::HashMap<String, String> {
 	fn from_lua_table(lua: gmod::lua::State) -> Self {
-		let mut hash_map = HashMap::new();
+		let mut hash_map = std::collections::HashMap::new();
 		unsafe {
-			lua.push_nil();
-			while lua.next(-2) != 0 {
-				lua.push_value(-2);
-				let key = match lua.get_string(-1) {
-					Some(key) => key.into_owned(),
-					None => {
-						lua.pop_n(2);
-						continue;
-					}
-				};
-				let val = match lua.get_string(-1) {
-					Some(key) => key.into_owned(),
-					None => {
-						lua.pop_n(3);
-						continue;
-					}
-				};
-				hash_map.insert(key, val);
-				lua.pop_n(2);
-			}
+			lua_stack_guard!(lua => {
+				lua.push_nil();
+				while lua.next(-2) != 0 {
+					lua.push_value(-1); // push a copy of value onto the stack
+					lua.push_value(-3); // push a copy of key onto the stack
+					let key = match lua.get_string(-1) {
+						Some(key) => key,
+						None => {
+							lua.pop_n(3);
+							continue;
+						}
+					};
+					let val = match lua.get_string(-2) {
+						Some(val) => val,
+						None => {
+							lua.pop_n(3);
+							continue;
+						}
+					};
+					hash_map.insert(key.into_owned(), val.into_owned());
+					lua.pop_n(3);
+				}
+			});
 		}
 		hash_map
 	}
