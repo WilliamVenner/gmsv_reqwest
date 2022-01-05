@@ -1,4 +1,4 @@
-# 🐱‍👤 gmsv_reqwest
+# 🌐 gmsv_reqwest
 
 This module is a drop-in replacement for Garry's Mod's [`HTTP`](https://wiki.facepunch.com/gmod/Global.HTTP) function, inspired by [`gmsv_chttp`](https://github.com/timschumi/gmod-chttp) created by [timschumi](https://github.com/timschumi).
 
