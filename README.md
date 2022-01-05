@@ -32,6 +32,6 @@ end
 
 ## Custom root certificates (for SSL/TLS)
 
-To add custom root certificates, place them in the `garrysmod/tls_certificates` directory.
+To add custom root certificates, place them in the `garrysmod/tls_certificates/client` directory.
 
 The certificates must be X509 and encoded in either `pem` or `der`. They must also end in the `.pem` or `.der` file extensions respective to their econding. If there is a problem loading the certificate, it'll be skipped over and a message will be displayed in the console.
