@@ -127,7 +127,7 @@ pub unsafe extern "C-unwind" fn callback_worker(lua: gmod::lua::State) -> i32 {
 						lua.push_binary_string(v.as_bytes());
 						lua.set_field(-2, k.as_ptr() as *const _);
 					} else {
-						lua.push_integer(lua.len(-1) as _);
+						lua.push_integer((lua.len(-1) + 1) as _);
 						lua.push_binary_string(v.as_bytes());
 						lua.set_table(-3);
 					}
