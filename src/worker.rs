@@ -1,10 +1,33 @@
-use std::sync::{Arc, Barrier};
+use std::{sync::{Arc, Barrier}, cell::Cell};
 
 use reqwest::{Client, ClientBuilder, header::HeaderMap};
 use singlyton::SingletonOption;
 use gmod::lua::LuaReference;
 
 use crate::{http::HTTPRequest, tls};
+
+thread_local! {
+	static PENDING: Cell<usize> = Cell::new(0);
+}
+pub fn send(lua: gmod::lua::State, request: HTTPRequest) {
+	PENDING.with(|pending| {
+		pending.set(pending.get() + 1);
+	});
+
+	WORKER_CHANNEL.get()
+		.send(request)
+		.expect("Worker channel hung up - this is a bug with gmsv_reqwest");
+
+	unsafe {
+		lua.get_global(lua_string!("hook"));
+		lua.get_field(-1, lua_string!("Add"));
+		lua.push_string("Think");
+		lua.push_string("reqwest");
+		lua.push_function(think);
+		lua.call(3, 0);
+		lua.pop();
+	}
+}
 
 pub enum CallbackResult {
 	Success(LuaReference, u16, HeaderMap, bytes::Bytes, Option<LuaReference>),
@@ -30,6 +53,7 @@ impl CallbackResult {
 		}
 	}
 
+	#[cold]
 	pub unsafe fn push_failure(lua: gmod::lua::State, error: &str) {
 		// Push the useless error message Gmod provides
 		lua.push_string("unsuccessful");
@@ -39,22 +63,9 @@ impl CallbackResult {
 	}
 }
 
-fn create_client() -> Client {
-	let mut client_builder = ClientBuilder::new();
-
-	match tls::get_loadable_certificates() {
-		Ok(certs) => for cert in certs {
-			client_builder = client_builder.add_root_certificate(cert);
-		},
-		Err(err) => eprintln!("[gmsv_reqwest] Unable to load TLS Certificates: {}", err)
-	}
-
-	client_builder.build().expect("Failed to initialize reqwest client")
-}
-
-pub static WORKER_THREAD: SingletonOption<std::thread::JoinHandle<()>> = SingletonOption::new();
-pub static WORKER_CHANNEL: SingletonOption<crossbeam::channel::Sender<HTTPRequest>> = SingletonOption::new();
-pub static CALLBACK_CHANNEL: SingletonOption<crossbeam::channel::Receiver<CallbackResult>> = SingletonOption::new();
+static WORKER_THREAD: SingletonOption<std::thread::JoinHandle<()>> = SingletonOption::new();
+static WORKER_CHANNEL: SingletonOption<crossbeam::channel::Sender<HTTPRequest>> = SingletonOption::new();
+static CALLBACK_CHANNEL: SingletonOption<crossbeam::channel::Receiver<CallbackResult>> = SingletonOption::new();
 
 #[magic_static]
 pub static CLIENT: reqwest::Client = create_client();
@@ -98,7 +109,7 @@ async fn process(tx: crossbeam::channel::Sender<CallbackResult>, mut request: HT
 	}
 }
 
-pub fn init(barrier: Arc<Barrier>) {
+fn worker(barrier: Arc<Barrier>) {
 	let (tx, request_rx) = crossbeam::channel::unbounded::<HTTPRequest>();
 	WORKER_CHANNEL.replace(tx);
 
@@ -123,7 +134,7 @@ pub fn init(barrier: Arc<Barrier>) {
 	});
 }
 
-pub unsafe extern "C-unwind" fn callback_worker(lua: gmod::lua::State) -> i32 {
+unsafe extern "C-unwind" fn think(lua: gmod::lua::State) -> i32 {
 	while let Ok(result) = CALLBACK_CHANNEL.get().try_recv() {
 		match result {
 			CallbackResult::Success(callback, status, headers, body, failed) => {
@@ -167,7 +178,73 @@ pub unsafe extern "C-unwind" fn callback_worker(lua: gmod::lua::State) -> i32 {
 				lua.dereference(reference);
 			}
 		}
+
+		let pending = PENDING.with(|pending| {
+			let n = pending.get().saturating_sub(1);
+			pending.set(n);
+			n
+		});
+
+		if pending == 0 {
+			// Remove the worker hook
+			lua.get_global(lua_string!("hook"));
+			lua.get_field(-1, lua_string!("Remove"));
+			lua.push_string("Think");
+			lua.push_string("reqwest");
+			lua.call(2, 0);
+			lua.pop();
+
+			debug_assert!(matches!(CALLBACK_CHANNEL.get().try_recv(), Err(crossbeam::channel::TryRecvError::Empty)));
+
+			return 0;
+		}
 	}
 
 	0
+}
+
+fn create_client() -> Client {
+	let mut client_builder = ClientBuilder::new();
+
+	match tls::get_loadable_certificates() {
+		Ok(certs) => for cert in certs {
+			client_builder = client_builder.add_root_certificate(cert);
+		},
+		Err(err) => eprintln!("[gmsv_reqwest] Unable to load TLS Certificates: {}", err)
+	}
+
+	client_builder.build().expect("Failed to initialize reqwest client")
+}
+
+pub fn init() {
+	magic_static::init!(CLIENT);
+
+	let barrier = Arc::new(Barrier::new(2));
+	let barrier_ref = barrier.clone();
+
+	WORKER_THREAD.replace(std::thread::spawn(move || worker(barrier_ref)));
+
+	barrier.wait();
+}
+
+pub fn shutdown(lua: gmod::lua::State) {
+	unsafe {
+		// Remove the worker hook
+		lua.get_global(lua_string!("hook"));
+		lua.get_field(-1, lua_string!("Remove"));
+		lua.push_string("Think");
+		lua.push_string("reqwest");
+		lua.call(2, 0);
+		lua.pop();
+	}
+
+	{
+		// Drop the channels, allowing us to join with the worker thread
+		CALLBACK_CHANNEL.take();
+		WORKER_CHANNEL.take();
+	}
+
+	if let Some(handle) = WORKER_THREAD.take() {
+		handle.join().ok();
+	}
 }
