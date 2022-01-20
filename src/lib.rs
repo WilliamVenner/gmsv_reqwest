@@ -13,6 +13,7 @@ mod blocking;
 
 unsafe extern "C-unwind" fn request(lua: gmod::lua::State) -> i32 {
 	// lua_run require("reqwest") reqwest({ url = "https://google.com", success = function(...) PrintTable({...}) end, failed = function(...) PrintTable({...}) end })
+	// lua_run require("reqwest") PrintTable({reqwest({ blocking = true, url = "https://google.com", success = function(...) PrintTable({...}) end, failed = function(...) PrintTable({...}) end })})
 
 	if lua.lua_type(1) != gmod::lua::LUA_TTABLE {
 		return 0;
@@ -41,6 +42,9 @@ unsafe fn gmod13_open(lua: gmod::lua::State) -> i32 {
 
 	lua.push_function(request);
 	lua.set_global(lua_string!("reqwest"));
+
+	lua.push_string(env!("CARGO_PKG_VERSION"));
+	lua.set_global(lua_string!("REQWEST_VERSION"));
 
 	0
 }
