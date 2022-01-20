@@ -2,14 +2,41 @@ use std::sync::{Arc, Barrier};
 
 use reqwest::{Client, ClientBuilder, header::HeaderMap};
 use singlyton::SingletonOption;
-use gmod::lua::{LuaReference, LuaInt};
+use gmod::lua::LuaReference;
 
 use crate::{http::HTTPRequest, tls};
 
 pub enum CallbackResult {
-	Success(LuaReference, LuaInt, HeaderMap, Vec<u8>, Option<LuaReference>),
+	Success(LuaReference, u16, HeaderMap, bytes::Bytes, Option<LuaReference>),
 	Failed(LuaReference, String, Option<LuaReference>),
 	FreeReference(LuaReference),
+}
+impl CallbackResult {
+	pub unsafe fn push_success<B: AsRef<[u8]>>(lua: gmod::lua::State, status: u16, headers: &HeaderMap, body: B) {
+		// Push HTTP status
+		lua.push_integer(status as _);
+
+		// Push body
+		lua.push_binary_string(body.as_ref());
+
+		// Push headers
+		lua.create_table(headers.len() as i32, headers.keys_len() as i32);
+		for (k, v) in headers {
+			let mut k = k.to_string();
+			k.push('\0');
+
+			lua.push_binary_string(v.as_bytes());
+			lua.set_field(-2, k.as_ptr() as *const _);
+		}
+	}
+
+	pub unsafe fn push_failure(lua: gmod::lua::State, error: &str) {
+		// Push the useless error message Gmod provides
+		lua.push_string("unsuccessful");
+
+		// Push the reqwest error message
+		lua.push_string(error);
+	}
 }
 
 fn create_client() -> Client {
@@ -44,9 +71,9 @@ async fn process(tx: crossbeam::channel::Sender<CallbackResult>, mut request: HT
 			if let Some(success) = success {
 				tx.send(CallbackResult::Success(
 					success,
-					response.status().as_u16() as LuaInt,
+					response.status().as_u16(),
 					response.headers().to_owned(),
-					response.bytes().await.expect("Failed to decode body bytes. This is a bug").to_vec(),
+					response.bytes().await.unwrap_or_default(),
 					failed
 				))
 				.expect("Response receiving channel hung up. This is a bug");
@@ -111,32 +138,8 @@ pub unsafe extern "C-unwind" fn callback_worker(lua: gmod::lua::State) -> i32 {
 				// Free the reference to the function
 				lua.dereference(callback);
 
-				// Push HTTP status
-				lua.push_integer(status);
-
-				// Push body
-				lua.push_binary_string(&body);
-
-				// Push headers
-				lua.create_table(headers.len() as i32, headers.keys_len() as i32);
-				for (k, v) in headers {
-					if let Some(k) = k {
-						let mut k = k.to_string();
-						k.push('\0');
-
-						lua.push_binary_string(v.as_bytes());
-						lua.set_field(-2, k.as_ptr() as *const _);
-					} else {
-						lua.push_integer((lua.len(-1) + 1) as _);
-						lua.push_binary_string(v.as_bytes());
-						lua.set_table(-3);
-					}
-				}
-
-				// Explicitly drop everything now so a longjmp doesn't troll us
-				drop(callback);
-				drop(status);
-				drop(body);
+				// Push success callback arguments
+				CallbackResult::push_success(lua, status, &headers, body);
 
 				lua.pcall_ignore(3, 0);
 			},
@@ -153,15 +156,8 @@ pub unsafe extern "C-unwind" fn callback_worker(lua: gmod::lua::State) -> i32 {
 				// Free the reference to the function
 				lua.dereference(callback);
 
-				// Push the useless error message Gmod provides
-				lua.push_string("unsuccessful");
-
-				// Push the reqwest error message
-				lua.push_string(&error);
-
-				// Explicitly drop everything now so a longjmp doesn't troll us
-				drop(callback);
-				drop(error);
+				// Push failure callback arguments
+				CallbackResult::push_failure(lua, &error);
 
 				lua.pcall_ignore(2, 0);
 			},

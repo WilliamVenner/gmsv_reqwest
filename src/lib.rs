@@ -12,6 +12,7 @@ mod http;
 use http::HTTPRequest;
 
 mod worker;
+mod blocking;
 
 unsafe extern "C-unwind" fn request(lua: gmod::lua::State) -> i32 {
 	// lua_run require("reqwest") reqwest({ url = "https://google.com", success = function(...) PrintTable({...}) end, failed = function(...) PrintTable({...}) end })
@@ -20,16 +21,24 @@ unsafe extern "C-unwind" fn request(lua: gmod::lua::State) -> i32 {
 		return 0;
 	}
 
-	let request = match HTTPRequest::from_lua_state(lua) {
+	lua.get_field(1, lua_string!("blocking"));
+	let blocking = lua.get_boolean(-1);
+	lua.pop();
+
+	let request = match HTTPRequest::from_lua_state(lua, blocking) {
 		Ok(request) => request,
 		Err(error) => lua.error(error.to_string())
 	};
 
-	worker::WORKER_CHANNEL.get()
-		.send(request)
-		.expect("Worker channel hung up - this is a bug with gmsv_reqwest");
+	if blocking {
+		return blocking::request(lua, request);
+	} else {
+		worker::WORKER_CHANNEL.get()
+			.send(request)
+			.expect("Worker channel hung up - this is a bug with gmsv_reqwest");
 
-	0
+		return 0;
+	}
 }
 
 #[gmod13_open]

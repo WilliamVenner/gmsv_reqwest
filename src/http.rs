@@ -9,6 +9,44 @@ pub enum Error {
 	InvalidURL,
 }
 
+macro_rules! into_reqwest {
+	($(($client:ty, $request:ty) => $ident:ident),*) => {
+		impl HTTPRequest {
+			$(pub fn $ident(self, client: &$client) -> $request {
+				let mut request = client.request(self.method, self.url);
+				if let Some(body) = self.body {
+					request = request.body(body);
+				} else if let Some(parameters) = self.parameters {
+					request = request.form(&parameters);
+				}
+
+				let mut has_user_agent = false;
+				if let Some(headers) = self.headers {
+					for (k, v) in headers {
+						if !has_user_agent && k.eq_ignore_ascii_case("User-Agent") {
+							has_user_agent = true;
+						}
+						request = request.header(&k, v);
+					}
+				}
+				if !has_user_agent {
+					request = request.header("User-Agent", "Valve/Steam HTTP Client 1.0 (4000)");
+				}
+
+				request = request.timeout(self.timeout.unwrap_or_else(|| Duration::from_secs(60)));
+
+				request = request.header("Content-Type", self.content_type);
+
+				request.build().expect("Failed to build reqwest::Request. This is a bug.")
+			})*
+		}
+	};
+}
+into_reqwest! {
+	(reqwest::Client, reqwest::Request) => into_reqwest,
+	(reqwest::blocking::Client, reqwest::blocking::Request) => into_blocking_reqwest
+}
+
 #[derive(Debug)]
 pub struct HTTPRequest {
 	method: reqwest::Method,
@@ -22,35 +60,7 @@ pub struct HTTPRequest {
 	pub failed: Option<LuaReference>,
 }
 impl HTTPRequest {
-	pub fn into_reqwest(self, client: &reqwest::Client) -> reqwest::Request {
-		let mut request = client.request(self.method, self.url);
-		if let Some(body) = self.body {
-			request = request.body(body);
-		} else if let Some(parameters) = self.parameters {
-			request = request.form(&parameters);
-		}
-
-		let mut has_user_agent = false;
-		if let Some(headers) = self.headers {
-			for (k, v) in headers {
-				if !has_user_agent && k.eq_ignore_ascii_case("User-Agent") {
-					has_user_agent = true;
-				}
-				request = request.header(&k, v);
-			}
-		}
-		if !has_user_agent {
-			request = request.header("User-Agent", "Valve/Steam HTTP Client 1.0 (4000)");
-		}
-
-		request = request.timeout(self.timeout.unwrap_or_else(|| Duration::from_secs(60)));
-
-		request = request.header("Content-Type", self.content_type);
-
-		request.build().expect("Failed to build reqwest::Request. This is a bug.")
-	}
-
-	pub fn from_lua_state(lua: gmod::lua::State) -> Result<Self, Error> {
+	pub fn from_lua_state(lua: gmod::lua::State, blocking: bool) -> Result<Self, Error> {
 		Ok(unsafe {
 			let method = {
 				lua.get_field(-1, lua_string!("method"));
@@ -156,22 +166,32 @@ impl HTTPRequest {
 				},
 
 				success: {
-					lua.get_field(-1, lua_string!("success"));
-					if lua.is_function(-1) {
-						Some(lua.reference())
-					} else {
-						lua.pop();
+					if blocking {
+						// Handled in `blocking` module
 						None
+					} else {
+						lua.get_field(-1, lua_string!("success"));
+						if lua.is_function(-1) {
+							Some(lua.reference())
+						} else {
+							lua.pop();
+							None
+						}
 					}
 				},
 
 				failed: {
-					lua.get_field(-1, lua_string!("failed"));
-					if lua.is_function(-1) {
-						Some(lua.reference())
-					} else {
-						lua.pop();
+					if blocking {
+						// Handled in `blocking` module
 						None
+					} else {
+						lua.get_field(-1, lua_string!("failed"));
+						if lua.is_function(-1) {
+							Some(lua.reference())
+						} else {
+							lua.pop();
+							None
+						}
 					}
 				},
 
