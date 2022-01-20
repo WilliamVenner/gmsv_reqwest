@@ -1,10 +1,7 @@
 #![feature(c_unwind)]
 
-#[macro_use]
-extern crate gmod;
-
-#[macro_use]
-extern crate magic_static;
+#[macro_use] extern crate gmod;
+#[macro_use] extern crate magic_static;
 
 mod tls;
 
