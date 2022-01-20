@@ -6,7 +6,7 @@ The module uses the [`reqwest`](https://docs.rs/reqwest/*/reqwest/) crate for di
 
 This module was written in Rust and serves as a decent example on how to write a Garry's Mod binary module in Rust, using the [`gmod`](https://github.com/WilliamVenner/gmod-rs) crate.
 
-## Installation
+# Installation
 
 Download the relevant module for your server's operating system and platform/Gmod branch from the [releases section](https://github.com/WilliamVenner/gmsv_reqwest/releases).
 
@@ -18,9 +18,15 @@ If you're not sure on what operating system/platform your server is running, run
 lua_run print((system.IsWindows()and"Windows"or system.IsLinux()and"Linux"or"Unsupported").." "..(jit.arch=="x64"and"x86-64"or"x86"))
 ```
 
-## Usage
+## Custom root certificates (for SSL/TLS)
 
-To use reqwest in your addons, you can put this snippet at the top of your code, which will fallback to Gmod's default HTTP function if reqwest is not installed on the server.
+To add custom root certificates, place them in the `garrysmod/tls_certificates/client` directory.
+
+The certificates must be X509 and encoded in either `pem` or `der`. They must also end in the `.pem` or `.der` file extensions respective to their econding. If there is a problem loading the certificate, it'll be skipped over and a message will be displayed in the console.
+
+# Overriding Garry's Mod HTTP
+
+To override Garry's Mod's `HTTP` function with `reqwest`, you can add this code snippet to `lua/autorun/server/reqwest.lua`:
 
 ```lua
 if pcall(require, "reqwest") and reqwest ~= nil then
@@ -30,8 +36,72 @@ else
 end
 ```
 
-## Custom root certificates (for SSL/TLS)
+# Developer Usage
 
-To add custom root certificates, place them in the `garrysmod/tls_certificates/client` directory.
+Once loaded, gmsv_reqwest will create a global function called `reqwest` which behaves exactly the same as [`HTTP`](https://wiki.facepunch.com/gmod/Global.HTTP) and uses the same configuration struct ([`HTTPRequest`](https://wiki.facepunch.com/gmod/Structures/HTTPRequest)).
 
-The certificates must be X509 and encoded in either `pem` or `der`. They must also end in the `.pem` or `.der` file extensions respective to their econding. If there is a problem loading the certificate, it'll be skipped over and a message will be displayed in the console.
+**There is one difference:** on HTTP request failure, reqwest will provide an extended error message (known as `errExt`) _as well as_ Garry's Mod's useless error message.
+
+## Example
+
+```lua
+require("reqwest")
+
+reqwest({
+    method = "GET",
+    url = "https://google.com",
+    timeout = 30,
+
+    headers = {
+        ["User-Agent"] = "foo",
+    },
+
+    success = function(status, body, headers)
+        print("HTTP " .. status)
+        PrintTable(headers)
+        print(body)
+    end,
+
+    failed = function(err, errExt)
+        print("Error: " .. err .. " (" .. errExt .. ")")
+    end
+})
+```
+
+# Thread-blocking requests
+
+You can make requests that block the main thread using gmsv_reqwest, i.e., they are not asynchronous.
+
+* Only do this if you know what you are doing.
+* Make sure that you choose an appropriate timeout to avoid timing out players if any are online and the request hangs.
+* If you provide a `success` and `failed` callback, they will still be called
+* On success, `true`, `status`, `body` and `headers` will be returned
+* On failure, `false`, `err`, `errExt` will be returned
+
+To do this, simply add `blocking = true` to the [`HTTPRequest`](https://wiki.facepunch.com/gmod/Structures/HTTPRequest) table when creating your HTTP request.
+
+## Example
+
+```lua
+require("reqwest")
+
+local success, status, body, headers = reqwest({
+    blocking = true, -- note this!
+
+    url = "https://google.com",
+
+    -- callbacks will still be called for blocking requests
+    success = function(status, body, headers) PrintTable({status, body, headers}) end,
+    failed = function(err, errExt) PrintTable({err, errExt}) end
+})
+if success then
+    print("HTTP " .. status)
+    PrintTable(headers)
+    print(body)
+else
+    local err, errExt = status, body
+    -- In this case, `status` will be the "error message" that Garry's Mod provides (typically always "unsuccessful")
+    --  and `body` will be a custom error message from reqwest which actually describes what the error was.
+    print("Error: " .. err .. " (" .. errExt .. ")")
+end
+```
