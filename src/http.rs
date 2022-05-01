@@ -72,7 +72,7 @@ impl HTTPRequest {
 					lua.pop();
 
 					method
-						.and_then(|bytes| reqwest::Method::from_bytes(&bytes).ok())
+						.and_then(|bytes| reqwest::Method::from_bytes(&bytes.to_ascii_uppercase()).ok())
 						.unwrap_or(reqwest::Method::GET)
 				}
 			};
