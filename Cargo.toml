@@ -1,6 +1,6 @@
 [package]
 name = "gmsv_reqwest"
-version = "3.0.0"
+version = "3.0.1"
 authors = ["William Venner <william@venner.io>"]
 edition = "2018"
 publish = false
@@ -15,7 +15,7 @@ opt-level = "s"
 lto = "thin"
 
 [dependencies]
-gmod = { version = "11.0", default-features = false }
+gmod = { version = "15.0", default-features = false }
 reqwest = { version = "0.11", default-features = false, features = ["rustls-tls-native-roots", "blocking"] }
 tokio = { version = "1.15", features = ["rt", "macros"] }
 crossbeam = { version = "0.8", default-features = false, features = ["std", "crossbeam-channel"] }
