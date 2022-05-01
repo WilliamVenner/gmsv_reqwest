@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use reqwest::Certificate;
 
-const CUSTOM_ROOT_CERT_DIR: &'static str = "garrysmod/tls_certificates/client";
+const CUSTOM_ROOT_CERT_DIR: &str = "garrysmod/tls_certificates/client";
 
 #[derive(thiserror::Error, Debug)]
 pub enum CertificateError {

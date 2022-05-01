@@ -1,5 +1,8 @@
 #![feature(c_unwind)]
 
+#![allow(clippy::never_loop)]
+#![allow(clippy::needless_return)]
+
 #[macro_use] extern crate gmod;
 #[macro_use] extern crate magic_static;
 
