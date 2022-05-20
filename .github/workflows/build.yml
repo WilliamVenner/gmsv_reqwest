@@ -9,39 +9,51 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build_linux:
+  build_linux32:
     runs-on: ubuntu-latest
-    container: quay.io/pypa/manylinux2014_x86_64
+    container: quay.io/pypa/manylinux2014_i686
     steps:
     - uses: actions/checkout@v2
-    - name: Install build dependencies
-      run: yum -y install glibc-devel.i686 libgcc.i686
     - name: Install nightly toolchain
       uses: actions-rs/toolchain@v1
       with:
         profile: minimal
         toolchain: nightly
         override: true
-    - name: Add targets
-      run: rustup target add x86_64-unknown-linux-gnu && rustup target add i686-unknown-linux-gnu
     - name: Build 32-bit
       run: cargo build --release --target i686-unknown-linux-gnu
-    - name: Build 64-bit
-      run: cargo build --release --target x86_64-unknown-linux-gnu
     - name: Strip debug symbols
-      run: |
-        strip target/i686-unknown-linux-gnu/release/libgmsv_reqwest.so
-        strip target/x86_64-unknown-linux-gnu/release/libgmsv_reqwest.so
+      run: strip target/i686-unknown-linux-gnu/release/libgmsv_reqwest.so
     - name: Rename binaries
-      run: |
-        mv target/i686-unknown-linux-gnu/release/libgmsv_reqwest.so target/i686-unknown-linux-gnu/release/gmsv_reqwest_linux.dll
-        mv target/x86_64-unknown-linux-gnu/release/libgmsv_reqwest.so target/x86_64-unknown-linux-gnu/release/gmsv_reqwest_linux64.dll
+      run: mv target/i686-unknown-linux-gnu/release/libgmsv_reqwest.so target/i686-unknown-linux-gnu/release/gmsv_reqwest_linux.dll
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
-        files: |
-          target/i686-unknown-linux-gnu/release/gmsv_reqwest_linux.dll
-          target/x86_64-unknown-linux-gnu/release/gmsv_reqwest_linux64.dll
+        files: target/i686-unknown-linux-gnu/release/gmsv_reqwest_linux.dll
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build_linux64:
+    runs-on: ubuntu-latest
+    container: quay.io/pypa/manylinux2014_x86_64
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install nightly toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: nightly
+        override: true
+    - name: Build 64-bit
+      run: cargo build --release --target x86_64-unknown-linux-gnu
+    - name: Strip debug symbols
+      run: strip target/x86_64-unknown-linux-gnu/release/libgmsv_reqwest.so
+    - name: Rename binaries
+      run: mv target/x86_64-unknown-linux-gnu/release/libgmsv_reqwest.so target/x86_64-unknown-linux-gnu/release/gmsv_reqwest_linux.dll
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: target/x86_64-unknown-linux-gnu/release/gmsv_reqwest_linux.dll
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
