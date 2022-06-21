@@ -42,18 +42,21 @@ Once loaded, gmsv_reqwest will create a global function called `reqwest` which b
 
 **There is one difference:** on HTTP request failure, reqwest will provide an extended error message (known as `errExt`) _as well as_ Garry's Mod's useless error message.
 
-## Example
+## Discord Webhook Example
 
 ```lua
 require("reqwest")
 
 reqwest({
-    method = "GET",
-    url = "https://google.com",
+    method = "POST",
+    url = "https://discord.com/api/webhooks/988854737435070417/pHbHIjR15oa4ZmJ1PMCwEPaK4hdlCC21AIme94Iw9Xh7M9Mhg6GLLV2u6Q1rppH_7esX",
     timeout = 30,
+    
+    body = util.TableToJSON({ content = "Hello, world!" }), -- https://discord.com/developers/docs/resources/webhook#execute-webhook
+    type = "application/json",
 
     headers = {
-        ["User-Agent"] = "foo",
+        ["User-Agent"] = "My User Agent", -- This is REQUIRED to dispatch a Discord webhook
     },
 
     success = function(status, body, headers)
@@ -66,6 +69,36 @@ reqwest({
         print("Error: " .. err .. " (" .. errExt .. ")")
     end
 })
+```
+
+_By the way, that webhook URL is fake :D_
+
+## Support both gmsv_reqwest and [`gmsv_chttp`](https://github.com/timschumi/gmod-chttp)
+
+This example loads either reqwest or CHTTP
+
+```lua
+if not reqwest and not CHTTP then
+    local suffix = ({"osx64", "osx", "linux64", "linux", "win64", "win32"})[(system.IsWindows() and 4 or 0) + (system.IsLinux() and 2 or 0) + (jit.arch == "x86" and 1 or 0) + 1]
+    local fmt = "lua/bin/gm" .. (CLIENT and "cl" or "sv") .. "_%s_%s.dll"
+    local function installed(name)
+        if file.Exists(string.format(fmt, name, suffix), "GAME") then return true end
+        if jit.versionnum ~= 20004 and jit.arch == "x86" and system.IsLinux() then return file.Exists(string.format(fmt, name, "linux32"), "GAME") end
+        return false
+    end
+
+    if installed("reqwest") then
+        require("reqwest")
+    end
+    if not reqwest and installed("chttp") then
+        require("chttp")
+    end
+    if not CHTTP then
+        error("reqwest or CHTTP is required to use this!")
+    end
+end
+
+-- Your code
 ```
 
 # Thread-blocking requests
