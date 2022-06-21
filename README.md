@@ -98,6 +98,8 @@ if not reqwest and not CHTTP then
     end
 end
 
+local HTTP = reqwest or CHTTP
+
 -- Your code
 ```
 
