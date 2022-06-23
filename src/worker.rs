@@ -19,12 +19,13 @@ pub fn send(lua: gmod::lua::State, request: HTTPRequest) {
 		.expect("Worker channel hung up - this is a bug with gmsv_reqwest");
 
 	unsafe {
-		lua.get_global(lua_string!("hook"));
-		lua.get_field(-1, lua_string!("Add"));
-		lua.push_string("Think");
+		lua.get_global(lua_string!("timer"));
+		lua.get_field(-1, lua_string!("Create"));
 		lua.push_string("reqwest");
+		lua.push_integer(0);
+		lua.push_integer(0);
 		lua.push_function(think);
-		lua.call(3, 0);
+		lua.call(4, 0);
 		lua.pop();
 	}
 }
@@ -187,11 +188,10 @@ unsafe extern "C-unwind" fn think(lua: gmod::lua::State) -> i32 {
 
 		if pending == 0 {
 			// Remove the worker hook
-			lua.get_global(lua_string!("hook"));
+			lua.get_global(lua_string!("timer"));
 			lua.get_field(-1, lua_string!("Remove"));
-			lua.push_string("Think");
 			lua.push_string("reqwest");
-			lua.call(2, 0);
+			lua.call(1, 0);
 			lua.pop();
 
 			debug_assert!(matches!(CALLBACK_CHANNEL.get().try_recv(), Err(crossbeam::channel::TryRecvError::Empty)));
@@ -230,11 +230,10 @@ pub fn init() {
 pub fn shutdown(lua: gmod::lua::State) {
 	unsafe {
 		// Remove the worker hook
-		lua.get_global(lua_string!("hook"));
+		lua.get_global(lua_string!("timer"));
 		lua.get_field(-1, lua_string!("Remove"));
-		lua.push_string("Think");
 		lua.push_string("reqwest");
-		lua.call(2, 0);
+		lua.call(1, 0);
 		lua.pop();
 	}
 
