@@ -15,10 +15,10 @@ pub fn send(lua: gmod::lua::State, request: HTTPRequest) {
 		pending.set(pending.get() + 1);
 	});
 
-	WORKER_CHANNEL
-		.get()
-		.send(request)
-		.expect("Worker channel hung up - this is a bug with gmsv_reqwest");
+	if WORKER_CHANNEL.get().send(request).is_err() {
+		eprintln!("[gmsv_reqwest] Worker channel hung up - this is a bug with gmsv_reqwest");
+		return;
+	}
 
 	unsafe {
 		lua.get_global(lua_string!("timer"));
@@ -71,41 +71,57 @@ static WORKER_CHANNEL: SingletonOption<crossbeam::channel::Sender<HTTPRequest>> 
 static CALLBACK_CHANNEL: SingletonOption<crossbeam::channel::Receiver<CallbackResult>> = SingletonOption::new();
 
 #[magic_static]
-pub static CLIENT: reqwest::Client = create_client();
+pub static CLIENT: Result<reqwest::Client, reqwest::Error> = create_client();
 
 async fn process(tx: crossbeam::channel::Sender<CallbackResult>, mut request: HTTPRequest) {
 	let (success, failed) = (request.success.take(), request.failed.take());
 
-	let response = match request.into_reqwest(&*CLIENT) {
-		Ok(request) => CLIENT.execute(request).await,
-		Err(err) => Err(err),
+	let response = match &*CLIENT {
+		Ok(client) => match request.into_reqwest(client).map_err(|err| err.to_string()) {
+			Ok(request) => client.execute(request).await.map_err(|err| err.to_string()),
+			Err(err) => Err(err),
+		},
+
+		Err(err) => Err(err.to_string()),
 	};
 
-	match response {
+	let result = tx.send(match response {
 		Ok(response) => {
 			if let Some(success) = success {
-				tx.send(CallbackResult::Success(
+				CallbackResult::Success(
 					success,
 					response.status().as_u16(),
 					response.headers().to_owned(),
 					response.bytes().await.unwrap_or_default(),
 					failed,
-				))
-				.expect("Response receiving channel hung up. This is a bug");
+				)
 			} else if let Some(failed) = failed {
-				tx.send(CallbackResult::FreeReference(failed))
-					.expect("Response receiving channel hung up. This is a bug");
+				CallbackResult::FreeReference(failed)
+			} else {
+				if cfg!(debug_assertions) {
+					unreachable!();
+				} else {
+					return;
+				}
 			}
 		}
 		Err(error) => {
 			if let Some(failed) = failed {
-				tx.send(CallbackResult::Failed(failed, error.to_string(), success))
-					.expect("Response receiving channel hung up. This is a bug");
+				CallbackResult::Failed(failed, error, success)
 			} else if let Some(success) = success {
-				tx.send(CallbackResult::FreeReference(success))
-					.expect("Response receiving channel hung up. This is a bug");
+				CallbackResult::FreeReference(success)
+			} else {
+				if cfg!(debug_assertions) {
+					unreachable!();
+				} else {
+					return;
+				}
 			}
 		}
+	});
+
+	if result.is_err() {
+		eprintln!("[gmsv_reqwest] Worker hung up - this is a bug with gmsv_reqwest");
 	}
 }
 
@@ -118,11 +134,13 @@ fn worker(barrier: Arc<Barrier>) {
 
 	barrier.wait();
 
-	let runtime = tokio::runtime::Builder::new_current_thread()
-		.enable_io()
-		.enable_time()
-		.build()
-		.expect("Failed to start Tokio runtime");
+	let runtime = match tokio::runtime::Builder::new_current_thread().enable_io().enable_time().build() {
+		Ok(runtime) => runtime,
+		Err(err) => {
+			eprintln!("[gmsv_reqwest] Failed to initialize Tokio runtime: {}", err);
+			return;
+		}
+	};
 
 	runtime.block_on(async move {
 		tokio::task::spawn_blocking(move || {
@@ -132,7 +150,7 @@ fn worker(barrier: Arc<Barrier>) {
 			}
 		})
 		.await
-		.expect("Failed to join thread")
+		.ok();
 	});
 }
 
@@ -204,7 +222,7 @@ unsafe extern "C-unwind" fn think(lua: gmod::lua::State) -> i32 {
 	0
 }
 
-fn create_client() -> Client {
+fn create_client() -> Result<Client, reqwest::Error> {
 	let mut client_builder = ClientBuilder::new();
 
 	match tls::get_loadable_certificates() {
@@ -216,7 +234,7 @@ fn create_client() -> Client {
 		Err(err) => eprintln!("[gmsv_reqwest] Unable to load TLS Certificates: {}", err),
 	}
 
-	client_builder.build().expect("Failed to initialize reqwest client")
+	client_builder.build()
 }
 
 pub fn init() {
