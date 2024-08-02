@@ -12,7 +12,7 @@ pub enum Error {
 macro_rules! into_reqwest {
 	($(($client:ty, $request:ty) => $ident:ident),*) => {
 		impl HTTPRequest {
-			$(pub fn $ident(self, client: &$client) -> $request {
+			$(pub fn $ident(self, client: &$client) -> Result<$request, reqwest::Error> {
 				let mut request = client.request(self.method, self.url);
 				if let Some(body) = self.body {
 					request = request.body(body);
@@ -37,7 +37,7 @@ macro_rules! into_reqwest {
 
 				request = request.header("Content-Type", self.content_type);
 
-				request.build().expect("Failed to build reqwest::Request. This is a bug.")
+				request.build()
 			})*
 		}
 	};

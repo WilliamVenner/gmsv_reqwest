@@ -1,14 +1,16 @@
-use crate::{tls, http::HTTPRequest, worker::CallbackResult};
+use crate::{http::HTTPRequest, tls, worker::CallbackResult};
 use reqwest::blocking::{Client, ClientBuilder};
 
 fn create_client() -> Client {
 	let mut client_builder = ClientBuilder::new();
 
 	match tls::get_loadable_certificates() {
-		Ok(certs) => for cert in certs {
-			client_builder = client_builder.add_root_certificate(cert);
-		},
-		Err(err) => eprintln!("[gmsv_reqwest] Unable to load TLS Certificates: {}", err)
+		Ok(certs) => {
+			for cert in certs {
+				client_builder = client_builder.add_root_certificate(cert);
+			}
+		}
+		Err(err) => eprintln!("[gmsv_reqwest] Unable to load TLS Certificates: {}", err),
 	}
 
 	client_builder.build().expect("Failed to initialize reqwest client")
@@ -22,9 +24,7 @@ thread_local! {
 pub fn request(lua: gmod::lua::State, request: HTTPRequest) -> i32 {
 	debug_assert_eq!(unsafe { lua.lua_type(1) }, gmod::lua::LUA_TTABLE);
 
-	let result = CLIENT.with(|client| {
-		client.execute(request.into_blocking_reqwest(client))
-	});
+	let result = CLIENT.with(|client| request.into_blocking_reqwest(client).and_then(|request| client.execute(request)));
 
 	match result {
 		Ok(response) => unsafe {
@@ -42,6 +42,7 @@ pub fn request(lua: gmod::lua::State, request: HTTPRequest) -> i32 {
 			CallbackResult::push_success(lua, status, &headers, body);
 			return 4;
 		},
+
 		Err(error) => unsafe {
 			let error = error.to_string();
 
@@ -54,6 +55,6 @@ pub fn request(lua: gmod::lua::State, request: HTTPRequest) -> i32 {
 			lua.push_boolean(false);
 			CallbackResult::push_failure(lua, &error);
 			return 3;
-		}
+		},
 	}
 }

@@ -1,10 +1,11 @@
-use std::{sync::{Arc, Barrier}, cell::Cell};
-
-use reqwest::{Client, ClientBuilder, header::HeaderMap};
-use singlyton::SingletonOption;
-use gmod::lua::LuaReference;
-
 use crate::{http::HTTPRequest, tls};
+use gmod::lua::LuaReference;
+use reqwest::{header::HeaderMap, Client, ClientBuilder};
+use singlyton::SingletonOption;
+use std::{
+	cell::Cell,
+	sync::{Arc, Barrier},
+};
 
 thread_local! {
 	static PENDING: Cell<usize> = Cell::new(0);
@@ -14,7 +15,8 @@ pub fn send(lua: gmod::lua::State, request: HTTPRequest) {
 		pending.set(pending.get() + 1);
 	});
 
-	WORKER_CHANNEL.get()
+	WORKER_CHANNEL
+		.get()
 		.send(request)
 		.expect("Worker channel hung up - this is a bug with gmsv_reqwest");
 
@@ -74,9 +76,10 @@ pub static CLIENT: reqwest::Client = create_client();
 async fn process(tx: crossbeam::channel::Sender<CallbackResult>, mut request: HTTPRequest) {
 	let (success, failed) = (request.success.take(), request.failed.take());
 
-	let response = CLIENT
-		.execute(request.into_reqwest(&*CLIENT))
-		.await;
+	let response = match request.into_reqwest(&*CLIENT) {
+		Ok(request) => CLIENT.execute(request).await,
+		Err(err) => Err(err),
+	};
 
 	match response {
 		Ok(response) => {
@@ -86,25 +89,21 @@ async fn process(tx: crossbeam::channel::Sender<CallbackResult>, mut request: HT
 					response.status().as_u16(),
 					response.headers().to_owned(),
 					response.bytes().await.unwrap_or_default(),
-					failed
+					failed,
 				))
 				.expect("Response receiving channel hung up. This is a bug");
 			} else if let Some(failed) = failed {
 				tx.send(CallbackResult::FreeReference(failed))
-				.expect("Response receiving channel hung up. This is a bug");
+					.expect("Response receiving channel hung up. This is a bug");
 			}
-		},
+		}
 		Err(error) => {
 			if let Some(failed) = failed {
-				tx.send(CallbackResult::Failed(
-					failed,
-					error.to_string(),
-					success
-				))
-				.expect("Response receiving channel hung up. This is a bug");
+				tx.send(CallbackResult::Failed(failed, error.to_string(), success))
+					.expect("Response receiving channel hung up. This is a bug");
 			} else if let Some(success) = success {
 				tx.send(CallbackResult::FreeReference(success))
-				.expect("Response receiving channel hung up. This is a bug");
+					.expect("Response receiving channel hung up. This is a bug");
 			}
 		}
 	}
@@ -131,7 +130,9 @@ fn worker(barrier: Arc<Barrier>) {
 				let tx = tx.clone();
 				tokio::spawn(process(tx, request));
 			}
-		}).await.expect("Failed to join thread")
+		})
+		.await
+		.expect("Failed to join thread")
 	});
 }
 
@@ -154,7 +155,7 @@ unsafe extern "C-unwind" fn think(lua: gmod::lua::State) -> i32 {
 				CallbackResult::push_success(lua, status, &headers, body);
 
 				lua.pcall_ignore(3, 0);
-			},
+			}
 
 			CallbackResult::Failed(callback, error, success) => {
 				// Get rid of the success callback from the registry if it exists
@@ -172,7 +173,7 @@ unsafe extern "C-unwind" fn think(lua: gmod::lua::State) -> i32 {
 				CallbackResult::push_failure(lua, &error);
 
 				lua.pcall_ignore(2, 0);
-			},
+			}
 
 			CallbackResult::FreeReference(reference) => {
 				// Free an unused reference from the registry
@@ -207,10 +208,12 @@ fn create_client() -> Client {
 	let mut client_builder = ClientBuilder::new();
 
 	match tls::get_loadable_certificates() {
-		Ok(certs) => for cert in certs {
-			client_builder = client_builder.add_root_certificate(cert);
-		},
-		Err(err) => eprintln!("[gmsv_reqwest] Unable to load TLS Certificates: {}", err)
+		Ok(certs) => {
+			for cert in certs {
+				client_builder = client_builder.add_root_certificate(cert);
+			}
+		}
+		Err(err) => eprintln!("[gmsv_reqwest] Unable to load TLS Certificates: {}", err),
 	}
 
 	client_builder.build().expect("Failed to initialize reqwest client")

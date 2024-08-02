@@ -1,18 +1,19 @@
 #![feature(c_unwind)]
-
 #![allow(clippy::never_loop)]
 #![allow(clippy::needless_return)]
 
-#[macro_use] extern crate gmod;
-#[macro_use] extern crate magic_static;
+#[macro_use]
+extern crate gmod;
+#[macro_use]
+extern crate magic_static;
 
 mod tls;
 
 mod http;
 use http::HTTPRequest;
 
-mod worker;
 mod blocking;
+mod worker;
 
 unsafe extern "C-unwind" fn request(lua: gmod::lua::State) -> i32 {
 	// lua_run require("reqwest") reqwest({ url = "https://google.com", success = function(...) PrintTable({...}) end, failed = function(...) PrintTable({...}) end })
@@ -28,7 +29,7 @@ unsafe extern "C-unwind" fn request(lua: gmod::lua::State) -> i32 {
 
 	let request = match HTTPRequest::from_lua_state(lua, blocking) {
 		Ok(request) => request,
-		Err(error) => lua.error(error.to_string())
+		Err(error) => lua.error(error.to_string()),
 	};
 
 	if blocking {
