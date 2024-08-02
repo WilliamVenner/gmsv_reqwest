@@ -13,6 +13,7 @@ crate-type = ["cdylib"]
 codegen-units = 1
 opt-level = "s"
 lto = "thin"
+strip = true
 
 [dependencies]
 gmod = { version = "15.0", default-features = false }
