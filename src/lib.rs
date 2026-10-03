@@ -1,4 +1,3 @@
-#![feature(c_unwind)]
 #![allow(clippy::never_loop)]
 #![allow(clippy::needless_return)]
 
